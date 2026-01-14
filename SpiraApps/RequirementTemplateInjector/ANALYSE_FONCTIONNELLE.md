@@ -1,1241 +1,1721 @@
-# Requirement Template Injector - Analyse Fonctionnelle Complete
+# Requirement Template Injector (RTI) - Analyse Fonctionnelle
 
-> Version 1.0 | Date: 2025-01-08
-
----
-
-## Informations Environnement Cible
-
-| Parametre | Valeur |
-|-----------|--------|
-| **URL Spira** | https://demo-in.spiraservice.net/mtx |
-| **API Version** | v7.0 |
-| **Projet Principal** | Library Information System (Sample) - ID: 1 |
-| **Template ID** | 1 |
+> **Version 6.0** | Date: 2026-01-14
+> Basee sur SPEC.md et Documentation_SpiraApps_Developpement.md v1.4.0
+>
+> **Approche finale :**
+> - Injection au **chargement** (`registerEvent_loaded`) + **changement de type** (`registerEvent_dropdownChanged`)
+> - **5 slots configurables** : dropdown natif (`settingTypeId: 11`) + template RichText (`settingTypeId: 2`)
+> - **Selection visuelle** du type dans une liste deroulante (pas de saisie manuelle)
 
 ---
 
 ## Table des Matieres
 
 1. [Contexte et Objectifs](#1-contexte-et-objectifs)
-2. [Exigences Fonctionnelles](#2-exigences-fonctionnelles)
-3. [Exigences Non-Fonctionnelles](#3-exigences-non-fonctionnelles)
-4. [Cas de Test](#4-cas-de-test)
-5. [Maquettes](#5-maquettes)
-6. [Outils de Debug Production](#6-outils-de-debug-production)
-7. [Donnees de Reference Environnement](#7-donnees-de-reference-environnement)
-8. [Matrice de Tracabilite](#8-matrice-de-tracabilite)
+2. [Specifications Fonctionnelles](#2-specifications-fonctionnelles)
+3. [Architecture Technique](#3-architecture-technique)
+4. [Maquettes Wireframes](#4-maquettes-wireframes)
+5. [Cas de Test](#5-cas-de-test)
+6. [Catalogue des Erreurs](#6-catalogue-des-erreurs)
+7. [Roadmap](#7-roadmap)
+8. [Annexes](#8-annexes)
 
 ---
 
 ## 1. Contexte et Objectifs
 
-### 1.1 Contexte
-Les equipes de redaction d'exigences ont besoin d'un guide structure pour rediger leurs analyses de maniere homogene. Actuellement, chaque redacteur utilise son propre format, ce qui genere des incoherences.
+### 1.1 Problematique
 
-### 1.2 Objectif Principal
-Developper une SpiraApp qui injecte automatiquement un template de texte formate (HTML) dans les champs RichText lors de la creation d'une nouvelle exigence.
+Les equipes de redaction d'exigences dans Spira manquent de structure homogene pour documenter leurs requirements. Chaque redacteur utilise son propre format, ce qui entraine :
 
-### 1.3 Benefices Attendus
-- Uniformisation de la redaction des exigences
-- Gain de temps pour les redacteurs
-- Meilleure qualite des specifications
-- Adaptabilite selon le type d'exigence
+- Des incoherences dans la documentation
+- Une perte de temps a formater manuellement
+- Une difficulte a maintenir des standards de qualite
+
+### 1.2 Solution Proposee
+
+Developper une **SpiraApp** nommee **Requirement Template Injector (RTI)** qui :
+
+1. Injecte automatiquement un template HTML dans le champ Description
+2. Adapte le template selon le type d'exigence (RequirementTypeId)
+3. S'execute **au chargement** et lors du **changement de type**
+4. Preserve le contenu existant si l'utilisateur a deja saisi du texte
+
+### 1.3 Choix d'Implementation
+
+#### Pourquoi `loaded` + `dropdownChanged` plutot que `dataPreSave` ?
+
+| Critere | `loaded` + `dropdownChanged` | `dataPreSave` |
+| ------- | ---------------------------- | ------------- |
+| **Simplicite** | ✅ Code synchrone, direct | ⚠️ Timing async complexe |
+| **UX** | ✅ Template visible AVANT save | ❌ Visible apres save seulement |
+| **Flexibilite** | ✅ L'user peut modifier avant save | ❌ Modification apres save |
+| **Changement type** | ✅ Re-injection automatique | ❌ Pas de re-injection |
+
+**Conclusion : `loaded` + `dropdownChanged` offre une meilleure UX et est plus simple.**
+
+#### Pourquoi des dropdowns natifs (`settingTypeId: 11`) ?
+
+| Critere | Dropdown natif | Saisie manuelle texte |
+| ------- | -------------- | --------------------- |
+| **UX Admin** | ✅ Selection visuelle, zero erreur | ❌ Doit connaitre le nom exact |
+| **Types disponibles** | ✅ Liste automatique du produit | ❌ Doit verifier les noms |
+| **Types personnalises** | ✅ Inclus automatiquement | ✅ Possible si nom correct |
+| **Erreurs** | ✅ Impossible de se tromper | ❌ Fautes de frappe possibles |
+
+**Configuration manifest :**
+
+```yaml
+- settingTypeId: 11        # ArtifactTypeSingleSelect (dropdown)
+  artifactTypeId: 1        # 1 = Requirement → liste les types d'exigences
+```
+
+**Le dropdown affiche :** Need, Feature, Use Case, User Story, Quality, + types custom du produit
+
+#### Pourquoi des champs RichText plutot que JSON ?
+
+| Critere | Champs RichText (settingTypeId: 2) | JSON (settingTypeId: 9) |
+| ------- | ---------------------------------- | ----------------------- |
+| **UX Admin** | ✅ Editeur visuel WYSIWYG | ❌ Edition JSON brute |
+| **Erreurs** | ✅ Impossible de casser la syntaxe | ❌ Erreurs JSON frequentes |
+| **Preview** | ✅ Voir le rendu direct | ❌ Pas de preview |
+| **Accessibilite** | ✅ Tout le monde peut l'utiliser | ❌ Necessite connaissances JSON |
+
+**Conclusion : Editeur RichText = configuration intuitive pour tous.**
+
+### 1.4 Comportement Utilisateur
+
+```text
+SCENARIO 1 - Creation nouvelle exigence :
+1. L'utilisateur clique sur "Nouveau"
+2. Le formulaire s'ouvre avec type par defaut (ex: Feature)
+3. *** Le template "Feature" est IMMEDIATEMENT injecte dans Description ***
+4. L'utilisateur peut modifier le template ou changer le type
+5. S'il change le type -> le nouveau template remplace (si champ inchange)
+6. Il sauvegarde avec le contenu pre-rempli
+
+SCENARIO 2 - Edition exigence existante :
+1. L'utilisateur ouvre un requirement existant
+2. Pas d'injection (artifactId existe)
+3. Comportement normal
+```
+
+### 1.5 Benefices Attendus
+
+| Benefice | Impact |
+| -------- | ------ |
+| Uniformisation | Toutes les exigences suivent le meme format |
+| Gain de temps | Template pre-rempli des l'ouverture |
+| Qualite | Structure guidee pour une meilleure redaction |
+| Flexibilite | Templates personnalisables visuellement |
+| Accessibilite | Pas besoin de connaitre JSON/HTML |
+
+### 1.6 Perimetre par Version
+
+| Version | Fonctionnalites | Priorite |
+| ------- | --------------- | -------- |
+| v1.0 | Template sur champ Description + Config RichText | Haute |
+| v1.1 | Support des champs Custom RichText | Moyenne |
+| v1.2 | Templates par projet (product-level) | Basse |
+| v1.3 | Import/Export des templates | Basse |
 
 ---
 
-## 2. Exigences Fonctionnelles
+## 2. Specifications Fonctionnelles
 
-### EF-001 : Injection de Template a la Creation
+### 2.1 Exigences Fonctionnelles
+
+#### EF-001 : Injection au Chargement
+
 | Attribut | Valeur |
-|----------|--------|
+| -------- | ------ |
 | **ID** | EF-001 |
-| **Titre** | Injection automatique du template a la creation |
-| **Description** | Lorsqu'un utilisateur cree une nouvelle exigence, le systeme doit automatiquement injecter le template correspondant dans le champ RichText cible |
-| **Priorite** | Haute |
-| **Criteres d'acceptation** | - Le template est injecte des l'ouverture du formulaire de creation<br>- Le champ cible contient le HTML du template<br>- L'utilisateur peut modifier le contenu injecte |
+| **Titre** | Injecter le template lors du chargement de la page |
+| **Priorite** | Critique |
+
+**Description :**
+
+L'injection du template doit se faire dans l'evenement `registerEvent_loaded`, des que la page s'affiche.
+
+**Implementation technique :**
+
+```javascript
+spiraAppManager.registerEvent_loaded(function() {
+    // Verifier si c'est une creation (pas d'artifactId)
+    if (!spiraAppManager.artifactId) {
+        injectTemplateForCurrentType();
+    }
+});
+```
+
+**Criteres d'acceptation :**
+
+- [ ] Le template est visible des l'ouverture du formulaire
+- [ ] Le template correspond au type par defaut (Feature)
+- [ ] Pas d'injection en mode edition
 
 ---
 
-### EF-002 : Templates Differencies par Type d'Exigence
+#### EF-002 : Re-injection au Changement de Type
+
 | Attribut | Valeur |
-|----------|--------|
+| -------- | ------ |
 | **ID** | EF-002 |
-| **Titre** | Templates differents selon le type d'exigence |
-| **Description** | Le systeme doit permettre de definir un template different pour chaque type d'exigence (Business, Functional, User Story, etc.) |
-| **Priorite** | Haute |
-| **Criteres d'acceptation** | - Chaque RequirementTypeId peut avoir son propre template<br>- Si aucun template n'est defini pour un type, le champ reste vide<br>- Le template se met a jour si l'utilisateur change le type |
+| **Titre** | Re-injecter le template quand l'utilisateur change le type |
+| **Priorite** | Critique |
+
+**Description :**
+
+Quand l'utilisateur change le RequirementTypeId, le template doit etre mis a jour.
+
+**Implementation technique :**
+
+```javascript
+spiraAppManager.registerEvent_dropdownChanged("RequirementTypeId", function(oldVal, newVal) {
+    // Re-injecter seulement si le champ n'a pas ete modifie
+    if (canInject()) {
+        injectTemplateForCurrentType();
+    }
+    return true; // Permettre le changement
+});
+```
+
+**Criteres d'acceptation :**
+
+- [ ] Changement de type -> nouveau template injecte
+- [ ] Seulement si le contenu actuel = template precedent ou vide
+- [ ] Le changement de type est autorise (`return true`)
 
 ---
 
-### EF-003 : Support du Champ Description Standard
+#### EF-003 : Detection du Mode Creation
+
 | Attribut | Valeur |
-|----------|--------|
+| -------- | ------ |
 | **ID** | EF-003 |
-| **Titre** | Injection dans le champ Description standard |
-| **Description** | Le systeme doit pouvoir injecter le template dans le champ "Description" natif des exigences |
-| **Priorite** | Haute |
-| **Criteres d'acceptation** | - Le champ "Description" peut etre selectionne comme cible<br>- Le template HTML s'affiche correctement dans l'editeur RichText |
+| **Titre** | Detecter si c'est une nouvelle exigence |
+| **Priorite** | Critique |
+
+**Implementation technique :**
+
+```javascript
+function isCreationMode() {
+    return !spiraAppManager.artifactId;
+}
+```
+
+**Criteres d'acceptation :**
+
+- [ ] `spiraAppManager.artifactId` est null/undefined en creation
+- [ ] Pas d'injection si l'artefact existe deja
 
 ---
 
-### EF-004 : Support des Champs Custom RichText
+#### EF-004 : Configuration par Slots (Dropdown + Template RichText)
+
 | Attribut | Valeur |
-|----------|--------|
+| -------- | ------ |
 | **ID** | EF-004 |
-| **Titre** | Injection dans les champs personnalises RichText |
-| **Description** | Le systeme doit pouvoir injecter le template dans n'importe quel champ personnalise de type RichText (Custom_01, Custom_02, etc.) |
-| **Priorite** | Moyenne |
-| **Criteres d'acceptation** | - Les champs Custom_XX de type RichText sont supportes<br>- L'administrateur peut specifier le nom du champ cible |
+| **Titre** | 5 slots configurables (dropdown type + template RichText) |
+| **Priorite** | Critique |
+
+**Description :**
+
+L'admin dispose de **5 slots**. Chaque slot contient :
+
+1. **Un dropdown natif** (settingTypeId: 11) pour **selectionner** le type d'exigence
+2. **Un editeur RichText** (settingTypeId: 2) pour configurer le template
+
+Le dropdown affiche automatiquement tous les types d'exigences du produit (standard + personnalises).
+
+**Product Settings (manifest) :**
+
+```yaml
+productSettings:
+
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 1 - Premier type configurable
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11             # Dropdown des types d'exigences
+    name: "type_id_1"
+    caption: "Type d'exigence #1"
+    position: 1
+    artifactTypeId: 1             # 1 = Requirement
+    tooltip: "Selectionnez le type d'exigence"
+
+  - settingTypeId: 2              # Rich text (HTML)
+    name: "template_1"
+    caption: "Template #1"
+    position: 2
+    tooltip: "Template HTML pour le type ci-dessus"
+
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 2 - Deuxieme type configurable
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: "type_id_2"
+    caption: "Type d'exigence #2"
+    position: 3
+    artifactTypeId: 1
+    tooltip: "Selectionnez le type d'exigence"
+
+  - settingTypeId: 2
+    name: "template_2"
+    caption: "Template #2"
+    position: 4
+    tooltip: "Template HTML pour le type ci-dessus"
+
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 3 - Troisieme type configurable
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: "type_id_3"
+    caption: "Type d'exigence #3"
+    position: 5
+    artifactTypeId: 1
+    tooltip: "Selectionnez le type d'exigence"
+
+  - settingTypeId: 2
+    name: "template_3"
+    caption: "Template #3"
+    position: 6
+    tooltip: "Template HTML pour le type ci-dessus"
+
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 4 - Quatrieme type configurable
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: "type_id_4"
+    caption: "Type d'exigence #4"
+    position: 7
+    artifactTypeId: 1
+    tooltip: "Selectionnez le type d'exigence"
+
+  - settingTypeId: 2
+    name: "template_4"
+    caption: "Template #4"
+    position: 8
+    tooltip: "Template HTML pour le type ci-dessus"
+
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 5 - Cinquieme type configurable
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: "type_id_5"
+    caption: "Type d'exigence #5"
+    position: 9
+    artifactTypeId: 1
+    tooltip: "Selectionnez le type d'exigence"
+
+  - settingTypeId: 2
+    name: "template_5"
+    caption: "Template #5"
+    position: 10
+    tooltip: "Template HTML pour le type ci-dessus"
+```
+
+**Avantages de cette approche :**
+
+| Avantage | Description |
+| -------- | ----------- |
+| **UX optimale** | L'admin selectionne dans une liste, zero erreur possible |
+| **Types auto** | Le dropdown liste automatiquement tous les types du produit |
+| **Types custom** | Les types personnalises apparaissent dans la liste |
+| **Simple** | Pas besoin de connaitre les IDs ou les noms exacts |
+| **Visuel** | Editeur RichText WYSIWYG pour les templates |
+
+**Criteres d'acceptation :**
+
+- [ ] 5 slots disponibles dans Product Settings
+- [ ] Chaque slot a un dropdown listant les types d'exigences du produit
+- [ ] Chaque slot a un editeur RichText pour le template
+- [ ] Le dropdown retourne directement le RequirementTypeId
+- [ ] Un slot sans type selectionne est ignore
+- [ ] Si un type est selectionne plusieurs fois, seul le premier template est utilise
 
 ---
 
-### EF-005 : Configuration des Templates via Admin
+#### EF-005 : Protection du Contenu Modifie
+
 | Attribut | Valeur |
-|----------|--------|
+| -------- | ------ |
 | **ID** | EF-005 |
-| **Titre** | Configuration des templates dans l'administration SpiraApp |
-| **Description** | L'administrateur doit pouvoir configurer les templates HTML pour chaque type d'exigence via l'interface d'administration de la SpiraApp |
+| **Titre** | Ne pas ecraser le contenu modifie par l'utilisateur |
 | **Priorite** | Haute |
-| **Criteres d'acceptation** | - Interface de configuration accessible dans Product Admin > SpiraApps<br>- Format de configuration clair (JSON ou champs separes)<br>- Validation des templates avant sauvegarde |
+
+**Description :**
+
+Si l'utilisateur a modifie le contenu (different du template original), ne pas re-injecter.
+
+**Implementation technique :**
+
+```javascript
+var lastInjectedTemplate = "";
+
+function canInject() {
+    var currentValue = spiraAppManager.getDataItemField("Description", "textValue");
+
+    // Peut injecter si:
+    // - Champ vide
+    // - Champ = dernier template injecte (pas modifie)
+    if (!currentValue || currentValue.trim() === "") return true;
+    if (currentValue === lastInjectedTemplate) return true;
+
+    return false;
+}
+```
+
+**Criteres d'acceptation :**
+
+- [ ] Pas d'injection si le champ a ete modifie manuellement
+- [ ] Injection OK si le champ = template precedent
+- [ ] Injection OK si le champ est vide
 
 ---
 
-### EF-006 : Mise a Jour du Template au Changement de Type
+#### EF-006 : Mode Debug
+
 | Attribut | Valeur |
-|----------|--------|
+| -------- | ------ |
 | **ID** | EF-006 |
-| **Titre** | Actualisation du template lors du changement de type |
-| **Description** | Si l'utilisateur change le type d'exigence apres la creation, le systeme doit proposer de mettre a jour le template |
+| **Titre** | Option de debug pour le depannage |
 | **Priorite** | Moyenne |
-| **Criteres d'acceptation** | - Detection du changement de type via evenement dropdown<br>- Confirmation demandee a l'utilisateur avant remplacement<br>- Option de conserver le contenu actuel |
+
+**Product Setting :**
+
+```yaml
+  - settingTypeId: 10             # Boolean
+    name: "debug_mode"
+    caption: "Mode debug"
+    position: 10
+    tooltip: "Affiche les logs dans la console navigateur (F12)"
+```
 
 ---
 
-### EF-007 : Non-Ecrasement du Contenu Existant
+### 2.2 Exigences Non-Fonctionnelles
+
+#### ENF-001 : Performance
+
 | Attribut | Valeur |
-|----------|--------|
-| **ID** | EF-007 |
-| **Titre** | Protection du contenu existant |
-| **Description** | Le systeme ne doit pas ecraser le contenu si le champ cible contient deja du texte (mode edition) |
-| **Priorite** | Haute |
-| **Criteres d'acceptation** | - En mode edition, aucune injection automatique<br>- Detection du mode (creation vs edition)<br>- Le contenu existant est preserve |
-
----
-
-### EF-008 : Activation/Desactivation par Type
-| Attribut | Valeur |
-|----------|--------|
-| **ID** | EF-008 |
-| **Titre** | Activation selective par type d'exigence |
-| **Description** | L'administrateur doit pouvoir activer ou desactiver l'injection pour certains types d'exigence |
-| **Priorite** | Basse |
-| **Criteres d'acceptation** | - Case a cocher ou liste pour activer/desactiver par type<br>- Types desactives = pas d'injection |
-
----
-
-## 3. Exigences Non-Fonctionnelles
-
-### ENF-001 : Performance
-| Attribut | Valeur |
-|----------|--------|
+| -------- | ------ |
 | **ID** | ENF-001 |
-| **Titre** | Temps de chargement |
-| **Description** | L'injection du template ne doit pas ralentir l'ouverture du formulaire |
-| **Critere** | Injection en moins de 500ms apres chargement de la page |
+| **Titre** | Injection immediate sans delai perceptible |
+| **Critere** | Injection < 100ms |
 
 ---
 
-### ENF-002 : Compatibilite
+#### ENF-002 : Compatibilite
+
 | Attribut | Valeur |
-|----------|--------|
+| -------- | ------ |
 | **ID** | ENF-002 |
-| **Titre** | Compatibilite navigateurs |
-| **Description** | La SpiraApp doit fonctionner sur les navigateurs supportes par Spira |
+| **Titre** | Support navigateurs modernes |
 | **Critere** | Chrome, Firefox, Edge (versions recentes) |
 
 ---
 
-### ENF-003 : Maintenabilite - Logs de Debug
+#### ENF-003 : Maintenabilite
+
 | Attribut | Valeur |
-|----------|--------|
+| -------- | ------ |
 | **ID** | ENF-003 |
-| **Titre** | Logs de debug en production |
-| **Description** | Le code doit inclure des logs configurables pour faciliter le debug en production |
-| **Critere** | Console.log avec prefixe identifiable, niveaux de log configurables |
+| **Titre** | Logs de debug configurables |
+| **Implementation** | Console.log avec prefixe [RTI] |
 
 ---
 
-### ENF-004 : Securite
-| Attribut | Valeur |
-|----------|--------|
-| **ID** | ENF-004 |
-| **Titre** | Securite des templates HTML |
-| **Description** | Les templates HTML doivent etre sanitizes pour eviter les injections XSS |
-| **Critere** | Utilisation de spiraAppManager.sanitizeHtml() si disponible |
+## 3. Architecture Technique
 
----
+### 3.1 Structure des Fichiers
 
-### ENF-005 : Gestion des Erreurs et Feedback Utilisateur
-| Attribut | Valeur |
-|----------|--------|
-| **ID** | ENF-005 |
-| **Titre** | Messages d'erreur clairs et actionnables |
-| **Description** | En cas d'echec, la SpiraApp doit afficher un message clair indiquant la cause du probleme et les actions correctives possibles |
-| **Critere** | Chaque type d'erreur a un message specifique, visible dans l'interface ET dans la console |
+```text
+RequirementTemplateInjector/
+├── manifest.yaml
+├── code/
+│   └── injector.js
+├── SPEC.md
+├── ANALYSE_FONCTIONNELLE.md (ce fichier)
+└── README.md
+```
 
----
+### 3.2 Manifest SpiraApp Complet
 
-## 3.1 Catalogue des Messages d'Erreur
+```yaml
+# ============================================================
+# REQUIREMENT TEMPLATE INJECTOR
+# Version 1.0.0 - Dropdown natif + Template RichText
+# ============================================================
 
-### ERR-001 : Configuration Manquante
-| Code | ERR-001 |
-|------|---------|
-| **Condition** | Aucun template configure dans les Product Settings |
-| **Message UI** | "RTI: Aucun template configure. Veuillez configurer les templates dans Administration > SpiraApps > Requirement Template Injector." |
-| **Niveau** | Warning |
-| **Action utilisateur** | Contacter l'administrateur pour configurer les templates |
+# Metadata obligatoire
+guid: "b3f5a8d2-7c41-4e9a-b6d8-1f2e3a4b5c6d"
+name: "RequirementTemplateInjector"
+caption: "Requirement Template Injector"
+summary: "Injecte des templates dans les champs RichText des exigences"
+description: >-
+  SpiraApp qui injecte automatiquement des templates de description
+  formates en HTML lors de la creation de nouvelles exigences.
+  Configurez jusqu'a 5 types d'exigences avec leurs templates.
+version: 1.0
+author: "SpiraApps Developer"
+license: "MIT"
+copyright: "2025"
 
----
+# ============================================================
+# PRODUCT SETTINGS - 5 SLOTS (Dropdown + Template RichText)
+# ============================================================
+productSettings:
 
-### ERR-002 : Configuration JSON Invalide
-| Code | ERR-002 |
-|------|---------|
-| **Condition** | Le JSON des templates est mal forme |
-| **Message UI** | "RTI: Erreur de configuration - le format JSON des templates est invalide. Verifiez la syntaxe dans les parametres." |
-| **Niveau** | Error |
-| **Log Console** | `[RTI] [ERROR] JSON parse error: {details}` avec le JSON brut |
-| **Action utilisateur** | Corriger le JSON dans Product Settings |
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 1
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11             # Dropdown des types d'exigences
+    name: "type_id_1"
+    caption: "Type d'exigence #1"
+    position: 1
+    artifactTypeId: 1             # 1 = Requirement
+    tooltip: "Selectionnez le type d'exigence"
 
----
+  - settingTypeId: 2              # Editeur RichText
+    name: "template_1"
+    caption: "Template #1"
+    position: 2
+    tooltip: "Template HTML pour le type ci-dessus"
 
-### ERR-003 : Champ Cible Introuvable
-| Code | ERR-003 |
-|------|---------|
-| **Condition** | Le champ cible (ex: Custom_05) n'existe pas sur la page |
-| **Message UI** | "RTI: Le champ cible '{fieldName}' n'est pas disponible sur cette page. Verifiez la configuration." |
-| **Niveau** | Error |
-| **Log Console** | `[RTI] [ERROR] Target field not found: {fieldName}` |
-| **Action utilisateur** | Verifier que le champ existe et est affiche sur le layout |
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 2
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: "type_id_2"
+    caption: "Type d'exigence #2"
+    position: 3
+    artifactTypeId: 1
+    tooltip: "Selectionnez le type d'exigence"
 
----
+  - settingTypeId: 2
+    name: "template_2"
+    caption: "Template #2"
+    position: 4
+    tooltip: "Template HTML pour le type ci-dessus"
 
-### ERR-004 : Type d'Exigence Non Reconnu
-| Code | ERR-004 |
-|------|---------|
-| **Condition** | Le RequirementTypeId n'a pas de template configure |
-| **Message UI** | Aucun (comportement silencieux - pas d'injection) |
-| **Niveau** | Info |
-| **Log Console** | `[RTI] [INFO] No template configured for type ID: {typeId}` |
-| **Action utilisateur** | Aucune - comportement normal |
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 3
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: "type_id_3"
+    caption: "Type d'exigence #3"
+    position: 5
+    artifactTypeId: 1
+    tooltip: "Selectionnez le type d'exigence"
 
----
+  - settingTypeId: 2
+    name: "template_3"
+    caption: "Template #3"
+    position: 6
+    tooltip: "Template HTML pour le type ci-dessus"
 
-### ERR-005 : Echec d'Injection
-| Code | ERR-005 |
-|------|---------|
-| **Condition** | L'appel a updateFormField() echoue |
-| **Message UI** | "RTI: Impossible d'injecter le template dans le champ. Essayez de rafraichir la page." |
-| **Niveau** | Error |
-| **Log Console** | `[RTI] [ERROR] Injection failed: {error.message}` |
-| **Action utilisateur** | Rafraichir la page, si persiste contacter support |
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 4
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: "type_id_4"
+    caption: "Type d'exigence #4"
+    position: 7
+    artifactTypeId: 1
+    tooltip: "Selectionnez le type d'exigence"
 
----
+  - settingTypeId: 2
+    name: "template_4"
+    caption: "Template #4"
+    position: 8
+    tooltip: "Template HTML pour le type ci-dessus"
 
-### ERR-006 : Mode Edition Detecte
-| Code | ERR-006 |
-|------|---------|
-| **Condition** | L'utilisateur ouvre une exigence existante (pas une creation) |
-| **Message UI** | Aucun (comportement silencieux) |
-| **Niveau** | Debug |
-| **Log Console** | `[RTI] [DEBUG] Edit mode detected - skipping injection` |
-| **Action utilisateur** | Aucune - comportement normal |
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 5
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: "type_id_5"
+    caption: "Type d'exigence #5"
+    position: 9
+    artifactTypeId: 1
+    tooltip: "Selectionnez le type d'exigence"
 
----
+  - settingTypeId: 2
+    name: "template_5"
+    caption: "Template #5"
+    position: 10
+    tooltip: "Template HTML pour le type ci-dessus"
 
-### ERR-007 : SpiraApp Non Initialisee
-| Code | ERR-007 |
-|------|---------|
-| **Condition** | APP_GUID ou spiraAppManager non disponible |
-| **Message UI** | "RTI: Erreur d'initialisation. La SpiraApp n'a pas pu demarrer correctement." |
-| **Niveau** | Error |
-| **Log Console** | `[RTI] [ERROR] Initialization failed: APP_GUID or spiraAppManager undefined` |
-| **Action utilisateur** | Verifier que la SpiraApp est activee, rafraichir la page |
+  # ══════════════════════════════════════════════════════════════
+  # OPTIONS
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 10             # Boolean
+    name: "debug_mode"
+    caption: "Mode debug"
+    position: 20
+    tooltip: "Affiche les logs dans la console navigateur (F12)"
 
----
+# ============================================================
+# PAGE CONTENTS - Code injecte sur RequirementDetails
+# ============================================================
+pageContents:
+  - pageId: 9                     # RequirementDetails
+    name: "templateInjector"
+    code: "file://code/injector.js"
+```
 
-### ERR-008 : Permission Insuffisante
-| Code | ERR-008 |
-|------|---------|
-| **Condition** | L'utilisateur n'a pas les droits de modification |
-| **Message UI** | Aucun (l'injection peut etre tentee mais Save echouera) |
-| **Niveau** | Warning |
-| **Log Console** | `[RTI] [WARN] User may not have modify permission` |
-| **Action utilisateur** | Aucune - Spira gerera l'erreur au Save |
+### 3.3 Structure des Slots
 
----
+| Slot | Setting Type ID | Setting Template | Description |
+| ---- | --------------- | ---------------- | ----------- |
+| 1 | `type_id_1` | `template_1` | Premier type configurable |
+| 2 | `type_id_2` | `template_2` | Deuxieme type configurable |
+| 3 | `type_id_3` | `template_3` | Troisieme type configurable |
+| 4 | `type_id_4` | `template_4` | Quatrieme type configurable |
+| 5 | `type_id_5` | `template_5` | Cinquieme type configurable |
 
-## 3.2 Affichage des Messages
+> **Note** : L'admin **selectionne** le type dans un dropdown. Le dropdown retourne directement le `RequirementTypeId`.
 
-### Types de Messages Disponibles
+### 3.4 Flux d'Execution
+
+```text
+[Page RequirementDetails charge]
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────┐
+│  registerEvent_loaded()                                      │
+│                                                              │
+│  1. Charger settings (templates RichText)                   │
+│  2. Verifier si creation (!spiraAppManager.artifactId)      │
+│  3. Recuperer type actuel (defaut: Feature = 2)             │
+│  4. Charger template correspondant                          │
+│  5. Si template existe: injecter dans Description           │
+└─────────────────────────────────────────────────────────────┘
+     │
+     ▼
+[Template visible immediatement dans le formulaire]
+     │
+     ▼
+[Utilisateur peut modifier le type]
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────┐
+│  registerEvent_dropdownChanged("RequirementTypeId")          │
+│                                                              │
+│  1. Verifier si contenu = template precedent ou vide        │
+│  2. Si oui: charger nouveau template et injecter            │
+│  3. Si non: ne pas toucher (utilisateur a modifie)          │
+│  4. return true pour autoriser le changement                │
+└─────────────────────────────────────────────────────────────┘
+     │
+     ▼
+[Nouveau template injecte si applicable]
+```
+
+### 3.5 Code Principal (injector.js)
 
 ```javascript
-// SUCCESS - Bandeau vert
-spiraAppManager.displaySuccessMessage("RTI: Template injecte avec succes!");
+/**
+ * REQUIREMENT TEMPLATE INJECTOR (RTI)
+ * Version 1.0.0
+ *
+ * Approche: loaded + dropdownChanged
+ * Configuration: 5 SLOTS (dropdown type natif + template RichText)
+ * Le dropdown retourne directement le RequirementTypeId - pas besoin d'API
+ */
 
-// WARNING - Bandeau jaune
-spiraAppManager.displayWarningMessage("RTI: Aucun template pour ce type d'exigence.");
+// ============================================================
+// CONSTANTES
+// ============================================================
+var RTI_VERSION = "1.0.0";
+var RTI_PREFIX = "[RTI]";
+var RTI_GUID = "b3f5a8d2-7c41-4e9a-b6d8-1f2e3a4b5c6d";
+var NUM_SLOTS = 5;
 
-// ERROR - Bandeau rouge
-spiraAppManager.displayErrorMessage("RTI: Erreur de configuration - JSON invalide.");
-```
+// ============================================================
+// ETAT
+// ============================================================
+var state = {
+    settings: null,
+    templates: {},           // Map: typeId (string) -> template HTML
+    lastInjectedTemplate: "",
+    debugMode: false
+};
 
-### Format Standard des Messages
-
-```
-[RTI] {Type}: {Message court}
-      Details: {Information supplementaire si necessaire}
-      Action: {Ce que l'utilisateur peut faire}
-```
-
-### Exemple Complet d'Affichage Erreur
-
-```javascript
-// Erreur avec details complets
-function showError(code, message, details, action) {
-    const fullMessage = `RTI [${code}]: ${message}`;
-    spiraAppManager.displayErrorMessage(fullMessage);
-
-    RTI_DEBUG.error(`${code} - ${message}`, {
-        details: details,
-        suggestedAction: action,
-        context: {
-            pageId: spiraAppManager.pageId,
-            artifactId: spiraAppManager.artifactId,
-            timestamp: new Date().toISOString()
-        }
-    });
+// ============================================================
+// LOGGING
+// ============================================================
+function log(level, message, data) {
+    if (!state.debugMode && level !== "ERROR") return;
+    var prefix = RTI_PREFIX + " [" + level + "]";
+    if (data !== undefined) {
+        console.log(prefix, message, data);
+    } else {
+        console.log(prefix, message);
+    }
 }
 
-// Usage
-showError(
-    'ERR-002',
-    'Configuration JSON invalide',
-    'Unexpected token at position 45',
-    'Verifiez la syntaxe JSON dans Product Settings'
-);
-```
-
----
-
-## 4. Cas de Test
-
-### CT-001 : Creation Nouvelle Exigence - Type avec Template
-| Attribut | Valeur |
-|----------|--------|
-| **ID** | CT-001 |
-| **Exigence liee** | EF-001, EF-002 |
-| **Titre** | Injection template a la creation |
-| **Preconditions** | - SpiraApp activee<br>- Template configure pour type "Business Requirement" |
-| **Etapes** | 1. Aller dans Requirements<br>2. Cliquer "Nouveau"<br>3. Selectionner type "Business Requirement" |
-| **Resultat attendu** | Le champ Description contient le template HTML formate |
-| **Statut** | A executer |
-
----
-
-### CT-002 : Creation Nouvelle Exigence - Type sans Template
-| Attribut | Valeur |
-|----------|--------|
-| **ID** | CT-002 |
-| **Exigence liee** | EF-002 |
-| **Titre** | Pas d'injection si type sans template |
-| **Preconditions** | - SpiraApp activee<br>- Aucun template pour type "Epic" |
-| **Etapes** | 1. Aller dans Requirements<br>2. Cliquer "Nouveau"<br>3. Selectionner type "Epic" |
-| **Resultat attendu** | Le champ Description reste vide |
-| **Statut** | A executer |
-
----
-
-### CT-003 : Changement de Type - Mise a Jour Template
-| Attribut | Valeur |
-|----------|--------|
-| **ID** | CT-003 |
-| **Exigence liee** | EF-006 |
-| **Titre** | MAJ template au changement de type |
-| **Preconditions** | - Templates configures pour "Business" et "Functional"<br>- Nouvelle exigence ouverte avec type "Business" |
-| **Etapes** | 1. Observer le template Business injecte<br>2. Changer le type en "Functional"<br>3. Confirmer la mise a jour |
-| **Resultat attendu** | Le template Functional remplace le template Business |
-| **Statut** | A executer |
-
----
-
-### CT-004 : Mode Edition - Pas d'Ecrasement
-| Attribut | Valeur |
-|----------|--------|
-| **ID** | CT-004 |
-| **Exigence liee** | EF-007 |
-| **Titre** | Protection du contenu en mode edition |
-| **Preconditions** | - Exigence existante avec description remplie |
-| **Etapes** | 1. Ouvrir l'exigence existante en edition<br>2. Observer le champ Description |
-| **Resultat attendu** | Le contenu original est conserve, pas de template injecte |
-| **Statut** | A executer |
-
----
-
-### CT-005 : Champ Custom RichText
-| Attribut | Valeur |
-|----------|--------|
-| **ID** | CT-005 |
-| **Exigence liee** | EF-004 |
-| **Titre** | Injection dans champ personnalise |
-| **Preconditions** | - Champ Custom_05 configure comme cible<br>- Template defini |
-| **Etapes** | 1. Creer nouvelle exigence<br>2. Observer le champ Custom_05 |
-| **Resultat attendu** | Le template est injecte dans Custom_05 |
-| **Statut** | A executer |
-
----
-
-### CT-006 : SpiraApp Desactivee
-| Attribut | Valeur |
-|----------|--------|
-| **ID** | CT-006 |
-| **Exigence liee** | - |
-| **Titre** | Comportement SpiraApp desactivee |
-| **Preconditions** | - SpiraApp desactivee pour le produit |
-| **Etapes** | 1. Creer nouvelle exigence |
-| **Resultat attendu** | Aucune injection, comportement Spira standard |
-| **Statut** | A executer |
-
----
-
-### CT-007 : Configuration Invalide
-| Attribut | Valeur |
-|----------|--------|
-| **ID** | CT-007 |
-| **Exigence liee** | ENF-003 |
-| **Titre** | Gestion configuration invalide |
-| **Preconditions** | - JSON de templates mal forme |
-| **Etapes** | 1. Creer nouvelle exigence |
-| **Resultat attendu** | Message d'erreur clair, pas de crash, log dans console |
-| **Statut** | A executer |
-
----
-
-### CT-008 : Performance - Temps d'Injection
-| Attribut | Valeur |
-|----------|--------|
-| **ID** | CT-008 |
-| **Exigence liee** | ENF-001 |
-| **Titre** | Mesure du temps d'injection |
-| **Preconditions** | - SpiraApp activee avec template |
-| **Etapes** | 1. Ouvrir console developpeur<br>2. Creer nouvelle exigence<br>3. Observer les timestamps dans les logs |
-| **Resultat attendu** | Injection complete en < 500ms |
-| **Statut** | A executer |
-
----
-
-## 5. Maquettes
-
-### 5.1 Maquette - Formulaire de Creation (Avant Injection)
-
-```
-+------------------------------------------------------------------+
-|  REQUIREMENT - Nouveau                                    [Save] |
-+------------------------------------------------------------------+
-|                                                                  |
-|  Nom: [________________________________]                         |
-|                                                                  |
-|  Type: [Business Requirement    v]                               |
-|                                                                  |
-|  Statut: [Requested            v]                                |
-|                                                                  |
-|  Description:                                                    |
-|  +------------------------------------------------------------+  |
-|  |                                                            |  |
-|  |  (champ vide)                                              |  |
-|  |                                                            |  |
-|  +------------------------------------------------------------+  |
-|                                                                  |
-+------------------------------------------------------------------+
-```
-
-### 5.2 Maquette - Formulaire de Creation (Apres Injection)
-
-```
-+------------------------------------------------------------------+
-|  REQUIREMENT - Nouveau                                    [Save] |
-+------------------------------------------------------------------+
-|                                                                  |
-|  Nom: [________________________________]                         |
-|                                                                  |
-|  Type: [Business Requirement    v]                               |
-|                                                                  |
-|  Statut: [Requested            v]                                |
-|                                                                  |
-|  Description:                                                    |
-|  +------------------------------------------------------------+  |
-|  |  ## Contexte Metier                                        |  |
-|  |  [Decrire le contexte metier et les enjeux]                |  |
-|  |                                                            |  |
-|  |  ## Description du Besoin                                  |  |
-|  |  [Decrire le besoin fonctionnel]                           |  |
-|  |                                                            |  |
-|  |  ## Benefices Attendus                                     |  |
-|  |  - [Benefice 1]                                            |  |
-|  |  - [Benefice 2]                                            |  |
-|  |                                                            |  |
-|  |  ## Criteres d'Acceptation                                 |  |
-|  |  - [ ] Critere 1                                           |  |
-|  |  - [ ] Critere 2                                           |  |
-|  +------------------------------------------------------------+  |
-|                                                                  |
-+------------------------------------------------------------------+
-```
-
-### 5.3 Maquette - Dialogue de Confirmation (Changement de Type)
-
-```
-+--------------------------------------------------+
-|  Requirement Template Injector                   |
-+--------------------------------------------------+
-|                                                  |
-|  Le type d'exigence a change.                    |
-|                                                  |
-|  Voulez-vous remplacer le contenu actuel         |
-|  par le template "Functional Requirement" ?      |
-|                                                  |
-|  [  Conserver  ]     [  Remplacer  ]             |
-|                                                  |
-+--------------------------------------------------+
-```
-
-### 5.4 Maquette - Configuration Admin (Product Settings)
-
-#### Vue d'ensemble de la page
-
-```
-+==================================================================================+
-|  PRODUCT ADMIN > SPIRAAPPS > REQUIREMENT TEMPLATE INJECTOR                       |
-+==================================================================================+
-|                                                                                  |
-|  +---------------------------+  +---------------------------------------------+  |
-|  |  NAVIGATION              |  |  CONFIGURATION                              |  |
-|  |--------------------------|  |---------------------------------------------|  |
-|  |  > Parametres Generaux   |  |                                             |  |
-|  |    Templates par Type    |  |   [Zone de configuration active]            |  |
-|  |    Options Avancees      |  |                                             |  |
-|  |    Debug & Logs          |  |                                             |  |
-|  +---------------------------+  +---------------------------------------------+  |
-|                                                                                  |
-+==================================================================================+
-```
-
-#### 5.4.1 Onglet "Parametres Generaux"
-
-```
-+==================================================================================+
-|  PARAMETRES GENERAUX                                                             |
-+==================================================================================+
-|                                                                                  |
-|  CHAMP CIBLE POUR L'INJECTION                                                    |
-|  +---------------------------------------------------------------------------+   |
-|  |  Champ RichText:  [Description                              v]            |   |
-|  |                   +-------------------------------------------------+     |   |
-|  |                   | Description (standard)                         |     |   |
-|  |                   | Custom_04 - Notes (RichText)                   |     |   |
-|  |                   +-------------------------------------------------+     |   |
-|  |                                                                           |   |
-|  |  [i] Le template sera injecte dans ce champ lors de la creation           |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|  COMPORTEMENT                                                                    |
-|  +---------------------------------------------------------------------------+   |
-|  |                                                                           |   |
-|  |  [x] Activer l'injection automatique a la creation                        |   |
-|  |                                                                           |   |
-|  |  [x] Demander confirmation avant de remplacer le contenu existant         |   |
-|  |                                                                           |   |
-|  |  [ ] Afficher un message de succes apres injection                        |   |
-|  |                                                                           |   |
-|  |  [ ] Injecter aussi lors du changement de type d'exigence                 |   |
-|  |                                                                           |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|                                                    [Annuler]  [Sauvegarder]      |
-+==================================================================================+
-```
-
-#### 5.4.2 Onglet "Templates par Type"
-
-```
-+==================================================================================+
-|  TEMPLATES PAR TYPE D'EXIGENCE                                                   |
-+==================================================================================+
-|                                                                                  |
-|  [+ Ajouter un template]                              [Importer JSON] [Exporter] |
-|                                                                                  |
-|  +---------------------------------------------------------------------------+   |
-|  | TYPE: Need (ID: 1)                                           [ON] [Edit]  |   |
-|  |---------------------------------------------------------------------------+   |
-|  | Apercu: "Contexte Metier / Objectifs / Benefices..."                      |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|  +---------------------------------------------------------------------------+   |
-|  | TYPE: Feature (ID: 2)  [DEFAUT]                              [ON] [Edit]  |   |
-|  |---------------------------------------------------------------------------+   |
-|  | Apercu: "Description / Criteres d'Acceptation..."                         |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|  +---------------------------------------------------------------------------+   |
-|  | TYPE: Use Case (ID: 3)                                       [ON] [Edit]  |   |
-|  |---------------------------------------------------------------------------+   |
-|  | Apercu: "Acteurs / Preconditions / Scenario Principal..."                 |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|  +---------------------------------------------------------------------------+   |
-|  | TYPE: User Story (ID: 4)                                     [ON] [Edit]  |   |
-|  |---------------------------------------------------------------------------+   |
-|  | Apercu: "En tant que / Je veux / Afin de..."                              |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|  +---------------------------------------------------------------------------+   |
-|  | TYPE: Quality (ID: 5)                                        [ON] [Edit]  |   |
-|  |---------------------------------------------------------------------------+   |
-|  | Apercu: "Exigence Qualite / Metriques / Verification..."                  |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|  +---------------------------------------------------------------------------+   |
-|  | TYPE: Epic (ID: 26)                                         [OFF] [Edit]  |   |
-|  |---------------------------------------------------------------------------+   |
-|  | (Aucun template - injection desactivee)                                   |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|                                                    [Annuler]  [Sauvegarder]      |
-+==================================================================================+
-```
-
-#### 5.4.3 Modal "Edition d'un Template"
-
-```
-+================================================================================+
-|  EDITER LE TEMPLATE - User Story (ID: 4)                              [X]     |
-+================================================================================+
-|                                                                                |
-|  NOM DU TYPE                                                                   |
-|  +------------------------------------------------------------------------+   |
-|  |  User Story                                                            |   |
-|  +------------------------------------------------------------------------+   |
-|                                                                                |
-|  STATUT                                                                        |
-|  +------------------------------------------------------------------------+   |
-|  |  (o) Active    ( ) Desactive                                           |   |
-|  +------------------------------------------------------------------------+   |
-|                                                                                |
-|  CONTENU DU TEMPLATE (HTML)                                                    |
-|  +------------------------------------------------------------------------+   |
-|  | [B] [I] [U] | [H1] [H2] [H3] | [UL] [OL] | [Table] | [</>] [Preview]   |   |
-|  +------------------------------------------------------------------------+   |
-|  |                                                                        |   |
-|  | <p><strong>En tant que</strong> [type d'utilisateur]</p>               |   |
-|  |                                                                        |   |
-|  | <p><strong>Je veux</strong> [action/fonctionnalite]</p>                |   |
-|  |                                                                        |   |
-|  | <p><strong>Afin de</strong> [benefice/valeur]</p>                      |   |
-|  |                                                                        |   |
-|  | <h3>Criteres d'acceptation</h3>                                        |   |
-|  | <ul>                                                                   |   |
-|  |   <li>Etant donne [contexte], quand [action], alors [resultat]</li>   |   |
-|  |   <li>Etant donne [contexte], quand [action], alors [resultat]</li>   |   |
-|  | </ul>                                                                  |   |
-|  |                                                                        |   |
-|  | <h3>Notes techniques</h3>                                              |   |
-|  | <p>[Informations pour l'equipe technique]</p>                         |   |
-|  |                                                                        |   |
-|  +------------------------------------------------------------------------+   |
-|                                                                                |
-|  APERCU EN TEMPS REEL                                                          |
-|  +------------------------------------------------------------------------+   |
-|  |                                                                        |   |
-|  |  **En tant que** [type d'utilisateur]                                  |   |
-|  |                                                                        |   |
-|  |  **Je veux** [action/fonctionnalite]                                   |   |
-|  |                                                                        |   |
-|  |  **Afin de** [benefice/valeur]                                         |   |
-|  |                                                                        |   |
-|  |  ### Criteres d'acceptation                                            |   |
-|  |  - Etant donne [contexte], quand [action], alors [resultat]            |   |
-|  |  - Etant donne [contexte], quand [action], alors [resultat]            |   |
-|  |                                                                        |   |
-|  |  ### Notes techniques                                                  |   |
-|  |  [Informations pour l'equipe technique]                                |   |
-|  |                                                                        |   |
-|  +------------------------------------------------------------------------+   |
-|                                                                                |
-|                                         [Annuler]  [Sauvegarder le template]   |
-+================================================================================+
-```
-
-#### 5.4.4 Onglet "Options Avancees"
-
-```
-+==================================================================================+
-|  OPTIONS AVANCEES                                                                |
-+==================================================================================+
-|                                                                                  |
-|  VALIDATION                                                                      |
-|  +---------------------------------------------------------------------------+   |
-|  |                                                                           |   |
-|  |  [x] Valider le HTML des templates avant sauvegarde                       |   |
-|  |                                                                           |   |
-|  |  [x] Sanitizer le HTML (supprimer scripts et attributs dangereux)         |   |
-|  |                                                                           |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|  MESSAGES PERSONNALISES                                                          |
-|  +---------------------------------------------------------------------------+   |
-|  |                                                                           |   |
-|  |  Message de succes:                                                       |   |
-|  |  +---------------------------------------------------------------------+  |   |
-|  |  | Template applique avec succes. N'oubliez pas de sauvegarder!       |  |   |
-|  |  +---------------------------------------------------------------------+  |   |
-|  |                                                                           |   |
-|  |  Message si aucun template:                                               |   |
-|  |  +---------------------------------------------------------------------+  |   |
-|  |  | Aucun template disponible pour ce type d'exigence.                 |  |   |
-|  |  +---------------------------------------------------------------------+  |   |
-|  |                                                                           |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|  CONFIGURATION JSON BRUTE (mode expert)                                          |
-|  +---------------------------------------------------------------------------+   |
-|  |  [!] Modification directe du JSON - pour utilisateurs avances             |   |
-|  |  +---------------------------------------------------------------------+  |   |
-|  |  | {                                                                   |  |   |
-|  |  |   "1": { "name": "Need", "enabled": true, "template": "..." },      |  |   |
-|  |  |   "2": { "name": "Feature", "enabled": true, "template": "..." },   |  |   |
-|  |  |   ...                                                               |  |   |
-|  |  | }                                                                   |  |   |
-|  |  +---------------------------------------------------------------------+  |   |
-|  |                                                                           |   |
-|  |  [Valider JSON]   Statut: [v] JSON valide                                 |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|                                                    [Annuler]  [Sauvegarder]      |
-+==================================================================================+
-```
-
-#### 5.4.5 Onglet "Debug & Logs"
-
-```
-+==================================================================================+
-|  DEBUG & LOGS                                                                    |
-+==================================================================================+
-|                                                                                  |
-|  MODE DEBUG                                                                      |
-|  +---------------------------------------------------------------------------+   |
-|  |                                                                           |   |
-|  |  [x] Activer les logs dans la console navigateur                          |   |
-|  |                                                                           |   |
-|  |  Niveau de log:  [Info          v]                                        |   |
-|  |                  +------------------+                                     |   |
-|  |                  | Error            |                                     |   |
-|  |                  | Warning          |                                     |   |
-|  |                  | Info             |                                     |   |
-|  |                  | Debug (verbose)  |                                     |   |
-|  |                  +------------------+                                     |   |
-|  |                                                                           |   |
-|  |  [ ] Afficher le badge de debug dans l'interface                          |   |
-|  |                                                                           |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|  TEST DE CONFIGURATION                                                           |
-|  +---------------------------------------------------------------------------+   |
-|  |                                                                           |   |
-|  |  Tester l'injection pour le type:  [Feature (ID: 2)    v]                 |   |
-|  |                                                                           |   |
-|  |  [Executer le test]                                                       |   |
-|  |                                                                           |   |
-|  |  Resultat du dernier test:                                                |   |
-|  |  +---------------------------------------------------------------------+  |   |
-|  |  | [v] Configuration chargee                                          |  |   |
-|  |  | [v] JSON valide                                                    |  |   |
-|  |  | [v] Template trouve pour type 2                                    |  |   |
-|  |  | [v] Champ cible 'Description' disponible                           |  |   |
-|  |  | [v] Injection simulee avec succes                                  |  |   |
-|  |  |                                                                     |  |   |
-|  |  | RESULTAT: PRET A UTILISER                                          |  |   |
-|  |  +---------------------------------------------------------------------+  |   |
-|  |                                                                           |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|  DIAGNOSTIC RAPIDE                                                               |
-|  +---------------------------------------------------------------------------+   |
-|  |                                                                           |   |
-|  |  [Exporter le rapport de debug]   [Copier dans le presse-papier]          |   |
-|  |                                                                           |   |
-|  |  Informations systeme:                                                    |   |
-|  |  - SpiraApp GUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx                    |   |
-|  |  - Version: 1.0.0                                                         |   |
-|  |  - Page ID: 9 (RequirementDetails)                                        |   |
-|  |  - Projet ID: 1                                                           |   |
-|  |  - Template ID: 1                                                         |   |
-|  |  - Types configures: 5/8                                                  |   |
-|  |                                                                           |   |
-|  +---------------------------------------------------------------------------+   |
-|                                                                                  |
-|                                                    [Annuler]  [Sauvegarder]      |
-+==================================================================================+
-```
-
-#### 5.4.6 Indicateurs d'Etat et Erreurs
-
-```
-+==================================================================================+
-|  INDICATEURS VISUELS DANS L'INTERFACE                                            |
-+==================================================================================+
-
-BANDEAU SUCCES (vert):
-+-----------------------------------------------------------------------------------+
-| [v] RTI: Template sauvegarde avec succes!                                    [X] |
-+-----------------------------------------------------------------------------------+
-
-BANDEAU AVERTISSEMENT (jaune):
-+-----------------------------------------------------------------------------------+
-| [!] RTI: 3 types d'exigence n'ont pas de template configure.                 [X] |
-+-----------------------------------------------------------------------------------+
-
-BANDEAU ERREUR (rouge):
-+-----------------------------------------------------------------------------------+
-| [X] RTI [ERR-002]: Le format JSON est invalide. Erreur a la ligne 15.        [X] |
-|     Action: Verifiez la syntaxe JSON dans l'onglet "Options Avancees".           |
-+-----------------------------------------------------------------------------------+
-
-VALIDATION EN TEMPS REEL DU JSON:
-+---------------------------------------------------------------------+
-| {                                                                   |
-|   "1": { "name": "Need", "enabled": true, "template": "..." },      |
-|   "2": { "name": "Feature" "enabled": true } <-- [X] Virgule manq.  |
-| }                                                                   |
-+---------------------------------------------------------------------+
-| Ligne 2: Erreur de syntaxe - virgule manquante apres "Feature"      |
-+---------------------------------------------------------------------+
-```
-
----
-
-## 6. Outils de Debug Production
-
-### 6.1 Module de Logging Integre
-
-Le code JavaScript inclura un module de logging configurable :
-
-```javascript
-// === DEBUG MODULE ===
-const RTI_DEBUG = {
-    enabled: true,  // Activer/desactiver via console: RTI_DEBUG.enabled = false
-    prefix: '[RTI]',
-    levels: {
-        INFO: 'INFO',
-        WARN: 'WARN',
-        ERROR: 'ERROR',
-        DEBUG: 'DEBUG'
-    },
-
-    log: function(level, message, data) {
-        if (!this.enabled && level !== this.levels.ERROR) return;
-
-        const timestamp = new Date().toISOString();
-        const logMessage = `${this.prefix} [${timestamp}] [${level}] ${message}`;
-
-        switch(level) {
-            case this.levels.ERROR:
-                console.error(logMessage, data || '');
-                break;
-            case this.levels.WARN:
-                console.warn(logMessage, data || '');
-                break;
-            case this.levels.DEBUG:
-                console.debug(logMessage, data || '');
-                break;
-            default:
-                console.log(logMessage, data || '');
-        }
-    },
-
-    info: function(msg, data) { this.log(this.levels.INFO, msg, data); },
-    warn: function(msg, data) { this.log(this.levels.WARN, msg, data); },
-    error: function(msg, data) { this.log(this.levels.ERROR, msg, data); },
-    debug: function(msg, data) { this.log(this.levels.DEBUG, msg, data); }
-};
-```
-
-### 6.2 Points de Log dans le Code
-
-| Point | Niveau | Message | Donnees |
-|-------|--------|---------|---------|
-| Initialisation | INFO | "SpiraApp initialized" | APP_GUID, version |
-| Page loaded | INFO | "Page loaded event fired" | pageId, artifactId |
-| Detection mode | DEBUG | "Mode detected" | isNewRequirement: true/false |
-| Lecture settings | DEBUG | "Settings loaded" | settings object |
-| Lecture type | DEBUG | "Requirement type" | typeId, typeName |
-| Template trouve | INFO | "Template found for type" | typeId, templateLength |
-| Template non trouve | WARN | "No template for type" | typeId |
-| Injection | INFO | "Template injected" | fieldName, success |
-| Changement type | INFO | "Type changed" | oldType, newType |
-| Erreur parsing | ERROR | "Config parse error" | error message |
-| Erreur injection | ERROR | "Injection failed" | error message |
-
-### 6.3 Commandes Console pour Debug en Prod
-
-```javascript
-// === COMMANDES DEBUG CONSOLE ===
-
-// Activer les logs detailles
-RTI_DEBUG.enabled = true;
-
-// Afficher la configuration actuelle
-RTI_showConfig();
-
-// Afficher l'etat actuel
-RTI_showState();
-
-// Tester l'injection manuellement
-RTI_testInject(typeId);
-
-// Afficher les types d'exigence disponibles
-RTI_showTypes();
-
-// Valider le JSON de configuration
-RTI_validateConfig();
-
-// Mesurer les performances
-RTI_benchmark();
-```
-
-### 6.4 Implementation des Commandes Debug
-
-```javascript
-// Exposer globalement pour acces console
-window.RTI_showConfig = function() {
-    console.group('[RTI] Current Configuration');
-    console.log('APP_GUID:', APP_GUID);
-    console.log('Settings:', SpiraAppSettings[APP_GUID]);
-    console.log('Target Field:', SpiraAppSettings[APP_GUID]?.targetField);
-    console.log('Templates:', SpiraAppSettings[APP_GUID]?.templates);
-    console.groupEnd();
-};
-
-window.RTI_showState = function() {
-    console.group('[RTI] Current State');
-    console.log('Page ID:', spiraAppManager.pageId);
-    console.log('Artifact ID:', spiraAppManager.artifactId);
-    console.log('Project ID:', spiraAppManager.projectId);
-    console.log('User ID:', spiraAppManager.userId);
-    console.log('Is New:', !spiraAppManager.artifactId);
-
-    try {
-        const typeId = spiraAppManager.getDataItemField('RequirementTypeId', 'intValue');
-        console.log('Current Type ID:', typeId);
-    } catch(e) {
-        console.log('Current Type ID: (unable to read)');
+// ============================================================
+// INITIALISATION
+// ============================================================
+initRTI();
+
+function initRTI() {
+    log("INFO", "Initializing RTI v" + RTI_VERSION);
+
+    // Charger les settings de base
+    if (!loadSettings()) {
+        log("WARN", "Settings not available or no templates configured, RTI disabled");
+        return;
     }
-    console.groupEnd();
-};
 
-window.RTI_showTypes = function() {
-    console.group('[RTI] Requirement Types');
-    const url = 'project-templates/' + spiraAppManager.projectTemplateId + '/requirements/types';
-    spiraAppManager.executeApi('RTI_Debug', '7.0', 'GET', url, null,
-        function(types) {
-            console.table(types.map(t => ({
-                ID: t.RequirementTypeId,
-                Name: t.Name,
-                IsActive: t.IsActive
-            })));
-            console.groupEnd();
-        },
-        function(err) {
-            console.error('Error fetching types:', err);
-            console.groupEnd();
-        }
-    );
-};
+    // Enregistrer event loaded
+    spiraAppManager.registerEvent_loaded(onPageLoaded);
 
-window.RTI_validateConfig = function() {
-    console.group('[RTI] Config Validation');
-    const templates = SpiraAppSettings[APP_GUID]?.templates;
+    // Enregistrer event changement de type
+    spiraAppManager.registerEvent_dropdownChanged("RequirementTypeId", onTypeChanged);
 
-    if (!templates) {
-        console.error('No templates configured!');
-        console.groupEnd();
+    log("INFO", "Event handlers registered");
+}
+
+// ============================================================
+// CHARGEMENT SETTINGS (SLOTS avec dropdown)
+// ============================================================
+function loadSettings() {
+    state.settings = SpiraAppSettings[RTI_GUID];
+
+    if (!state.settings) {
         return false;
     }
 
-    try {
-        const parsed = typeof templates === 'string' ? JSON.parse(templates) : templates;
-        console.log('JSON valid:', true);
-        console.log('Types configured:', Object.keys(parsed).length);
+    // Mode debug
+    state.debugMode = (state.settings.debug_mode === true ||
+                       state.settings.debug_mode === "Y");
 
-        Object.keys(parsed).forEach(key => {
-            const t = parsed[key];
-            console.log(`  Type ${key}:`, {
-                name: t.name || '(no name)',
-                enabled: t.enabled !== false,
-                templateLength: t.template?.length || 0
-            });
-        });
+    // Charger les templates depuis les slots (dropdown retourne directement l'ID)
+    state.templates = {};
 
-        console.groupEnd();
+    for (var i = 1; i <= NUM_SLOTS; i++) {
+        // type_id_X contient directement le RequirementTypeId (depuis dropdown)
+        var typeId = state.settings["type_id_" + i];
+        var template = state.settings["template_" + i];
+
+        // Si le type est selectionne et le template n'est pas vide
+        if (typeId && template && template.trim() !== "") {
+            var typeIdStr = String(typeId);
+            // Premier template pour ce type gagne (si doublon)
+            if (!state.templates[typeIdStr]) {
+                state.templates[typeIdStr] = template;
+                log("DEBUG", "Slot " + i + ": Type ID " + typeIdStr + " configured");
+            } else {
+                log("WARN", "Slot " + i + ": Type ID " + typeIdStr + " already configured, skipping");
+            }
+        }
+    }
+
+    var configuredCount = Object.keys(state.templates).length;
+    log("DEBUG", "Templates configured:", configuredCount);
+    return configuredCount > 0;
+}
+
+// ============================================================
+// HANDLER: PAGE LOADED
+// ============================================================
+function onPageLoaded() {
+    log("DEBUG", "Page loaded");
+
+    // Seulement en mode creation
+    if (spiraAppManager.artifactId) {
+        log("DEBUG", "Edit mode (artifactId exists), skipping");
+        return;
+    }
+
+    log("DEBUG", "Creation mode detected");
+    injectTemplateForCurrentType();
+}
+
+// ============================================================
+// HANDLER: TYPE CHANGED
+// ============================================================
+function onTypeChanged(oldVal, newVal) {
+    log("DEBUG", "Type changed", { from: oldVal, to: newVal });
+
+    // Seulement en mode creation
+    if (spiraAppManager.artifactId) {
         return true;
-    } catch(e) {
-        console.error('JSON parse error:', e.message);
-        console.groupEnd();
-        return false;
-    }
-};
-
-window.RTI_benchmark = function() {
-    console.group('[RTI] Performance Benchmark');
-    const start = performance.now();
-
-    // Simuler les operations
-    const t1 = performance.now();
-    const settings = SpiraAppSettings[APP_GUID];
-    console.log('Settings access:', (performance.now() - t1).toFixed(2) + 'ms');
-
-    const t2 = performance.now();
-    try {
-        const parsed = JSON.parse(settings?.templates || '{}');
-        console.log('JSON parse:', (performance.now() - t2).toFixed(2) + 'ms');
-    } catch(e) {}
-
-    const t3 = performance.now();
-    try {
-        const field = spiraAppManager.getDataItemField('Description', 'textValue');
-        console.log('Field read:', (performance.now() - t3).toFixed(2) + 'ms');
-    } catch(e) {}
-
-    console.log('Total:', (performance.now() - start).toFixed(2) + 'ms');
-    console.groupEnd();
-};
-
-window.RTI_testInject = function(typeId) {
-    console.group('[RTI] Test Injection for Type ' + typeId);
-
-    try {
-        const templates = JSON.parse(SpiraAppSettings[APP_GUID]?.templates || '{}');
-        const template = templates[typeId];
-
-        if (!template) {
-            console.warn('No template found for type', typeId);
-            console.groupEnd();
-            return;
-        }
-
-        console.log('Template found:', template.name);
-        console.log('HTML Preview:', template.template?.substring(0, 200) + '...');
-
-        // Tenter l'injection
-        const targetField = SpiraAppSettings[APP_GUID]?.targetField || 'Description';
-        spiraAppManager.updateFormField(targetField, 'textValue', template.template);
-        console.log('Injection attempted on field:', targetField);
-
-    } catch(e) {
-        console.error('Test failed:', e.message);
     }
 
-    console.groupEnd();
-};
-```
+    // Verifier si on peut injecter (contenu non modifie)
+    if (canInject()) {
+        // Petit delai pour laisser le dropdown se mettre a jour
+        setTimeout(function() {
+            injectTemplateForCurrentType();
+        }, 10);
+    } else {
+        log("DEBUG", "Content modified by user, skipping injection");
+    }
 
-### 6.5 Indicateur Visuel de Debug (Optionnel)
-
-```javascript
-// Afficher un badge de debug dans l'interface
-window.RTI_showDebugBadge = function() {
-    const badge = document.createElement('div');
-    badge.id = 'rti-debug-badge';
-    badge.innerHTML = '[RTI DEBUG]';
-    badge.style.cssText = `
-        position: fixed;
-        bottom: 10px;
-        right: 10px;
-        background: #ff6b6b;
-        color: white;
-        padding: 5px 10px;
-        font-size: 12px;
-        font-family: monospace;
-        border-radius: 4px;
-        z-index: 99999;
-        cursor: pointer;
-    `;
-    badge.onclick = function() {
-        RTI_showState();
-        RTI_showConfig();
-    };
-    document.body.appendChild(badge);
-};
-
-window.RTI_hideDebugBadge = function() {
-    const badge = document.getElementById('rti-debug-badge');
-    if (badge) badge.remove();
-};
-```
-
-### 6.6 Export des Logs
-
-```javascript
-window.RTI_exportLogs = function() {
-    // Collecter toutes les informations de debug
-    const report = {
-        timestamp: new Date().toISOString(),
-        appGuid: APP_GUID,
-        spiraInfo: {
-            pageId: spiraAppManager.pageId,
-            projectId: spiraAppManager.projectId,
-            artifactId: spiraAppManager.artifactId,
-            userId: spiraAppManager.userId,
-            baseUrl: spiraAppManager.baseUrl
-        },
-        settings: SpiraAppSettings[APP_GUID],
-        browserInfo: {
-            userAgent: navigator.userAgent,
-            language: navigator.language
-        }
-    };
-
-    // Copier dans le presse-papier
-    const json = JSON.stringify(report, null, 2);
-    navigator.clipboard.writeText(json).then(() => {
-        console.log('[RTI] Debug report copied to clipboard!');
-        alert('Debug report copied to clipboard!');
-    });
-
-    return report;
-};
-```
-
----
-
-## 7. Donnees de Reference Environnement
-
-### 7.1 Types d'Exigences (Template ID: 1)
-
-> Donnees recuperees depuis l'API Spira le 2025-01-08
-
-| RequirementTypeId | Nom | Actif | Par Defaut | Supporte Steps |
-|-------------------|-----|-------|------------|----------------|
-| 1 | Need | Oui | Non | Non |
-| 2 | Feature | Oui | **Oui** | Non |
-| 3 | Use Case | Oui | Non | **Oui** |
-| 4 | User Story | Oui | Non | Non |
-| 5 | Quality | Oui | Non | Non |
-| 6 | Design Element | Oui | Non | Non |
-| 13 | Acceptance Criteria | Oui | Non | Non |
-| 26 | Epic | Oui | Non | Non |
-
-### 7.2 Proprietes Personnalisees Requirements (Template ID: 1)
-
-| FieldName | Nom | Type | RichText | Description |
-|-----------|-----|------|----------|-------------|
-| Custom_01 | URL | Text | Non | Enter the relevant URL |
-| Custom_02 | Difficulty | List | Non | Difficulty (Easy/Moderate/Difficult) |
-| Custom_03 | Classification | List | Non | Regulatory/Statutory |
-| Custom_04 | Notes | Text | **Oui** | Additional notes |
-| Custom_05 | Review Date | Date | Non | Review deadline |
-| Custom_06 | Ranking | Integer | Non | Ranking value |
-| Custom_07 | Decimal | Decimal | Non | - |
-
-> **Important** : Le champ `Custom_04` (Notes) est de type RichText et peut etre utilise comme cible alternative.
-
-### 7.3 Projets Disponibles
-
-| ProjectId | Nom | TemplateId |
-|-----------|-----|------------|
-| 1 | Library Information System (Sample) | 1 |
-| 2 | Sample Empty Product 1 | 1 |
-| 3 | Sample Empty Product 2 | 2 |
-
----
-
-## 8. Matrice de Tracabilite
-
-| Exigence | Cas de Test | Priorite | Statut |
-|----------|-------------|----------|--------|
-| EF-001 | CT-001 | Haute | A developper |
-| EF-002 | CT-001, CT-002 | Haute | A developper |
-| EF-003 | CT-001 | Haute | A developper |
-| EF-004 | CT-005 | Moyenne | A developper |
-| EF-005 | CT-007 | Haute | A developper |
-| EF-006 | CT-003 | Moyenne | A developper |
-| EF-007 | CT-004 | Haute | A developper |
-| EF-008 | CT-002 | Basse | A developper |
-| ENF-001 | CT-008 | Haute | A developper |
-| ENF-002 | - | Haute | A verifier |
-| ENF-003 | CT-007, CT-008 | Haute | A developper |
-| ENF-004 | - | Haute | A developper |
-
----
-
-## Annexes
-
-### A. Configuration des Templates Recommandee
-
-Basee sur les types d'exigences de votre environnement :
-
-```json
-{
-  "1": {
-    "name": "Need",
-    "enabled": true,
-    "template": "<h2>Contexte Metier</h2><p>[Decrire le besoin business]</p><h2>Objectifs</h2><ul><li>[Objectif 1]</li></ul>"
-  },
-  "2": {
-    "name": "Feature",
-    "enabled": true,
-    "template": "<h2>Description</h2><p>[Decrire la fonctionnalite]</p><h2>Criteres d'Acceptation</h2><ul><li>[ ] Critere 1</li></ul>"
-  },
-  "3": {
-    "name": "Use Case",
-    "enabled": true,
-    "template": "<h2>Acteurs</h2><p>[Lister les acteurs]</p><h2>Preconditions</h2><p>[Conditions prealables]</p><h2>Scenario Principal</h2><ol><li>[Etape 1]</li></ol><h2>Scenarios Alternatifs</h2><p>[Variations]</p>"
-  },
-  "4": {
-    "name": "User Story",
-    "enabled": true,
-    "template": "<p><strong>En tant que</strong> [type utilisateur]</p><p><strong>Je veux</strong> [action]</p><p><strong>Afin de</strong> [benefice]</p><h3>Criteres d'acceptation</h3><ul><li>Etant donne [contexte], quand [action], alors [resultat]</li></ul>"
-  },
-  "5": {
-    "name": "Quality",
-    "enabled": true,
-    "template": "<h2>Exigence Qualite</h2><p>[Description]</p><h2>Metriques</h2><ul><li>[Metrique 1]: [Valeur cible]</li></ul><h2>Methode de Verification</h2><p>[Comment verifier]</p>"
-  },
-  "26": {
-    "name": "Epic",
-    "enabled": false,
-    "template": ""
-  }
+    return true; // Autoriser le changement de type
 }
+
+// ============================================================
+// INJECTION DU TEMPLATE
+// ============================================================
+function injectTemplateForCurrentType() {
+    // Recuperer le type actuel
+    var typeField = spiraAppManager.getDataItemField("RequirementTypeId", "intValue");
+    var typeId = String(typeField);
+    log("DEBUG", "Current type ID: " + typeId);
+
+    // Recuperer le template depuis la map
+    var template = state.templates[typeId];
+
+    if (!template) {
+        log("INFO", "No template configured for type ID " + typeId);
+        state.lastInjectedTemplate = "";
+        return;
+    }
+
+    // Injecter
+    log("INFO", "Injecting template for type ID " + typeId);
+    spiraAppManager.updateFormField("Description", template);
+    state.lastInjectedTemplate = template;
+
+    // Message de succes
+    spiraAppManager.displaySuccessMessage("[RTI] Template injecte pour le type selectionne");
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function canInject() {
+    var currentValue = spiraAppManager.getDataItemField("Description", "textValue");
+
+    // Peut injecter si champ vide
+    if (!currentValue || currentValue.trim() === "") {
+        return true;
+    }
+
+    // Peut injecter si contenu = dernier template (pas modifie)
+    if (currentValue === state.lastInjectedTemplate) {
+        return true;
+    }
+
+    // Verifier aussi si c'est un des templates configures
+    for (var typeId in state.templates) {
+        if (currentValue === state.templates[typeId]) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// ============================================================
+// DEBUG HELPERS (accessibles depuis console F12)
+// ============================================================
+window.RTI_showState = function() {
+    console.log(RTI_PREFIX + " State:", state);
+    return state;
+};
+
+window.RTI_showTemplates = function() {
+    console.log(RTI_PREFIX + " Templates mapping (typeId -> template):");
+    for (var id in state.templates) {
+        console.log("  Type ID " + id + ": " + state.templates[id].substring(0, 50) + "...");
+    }
+    return state.templates;
+};
+
+window.RTI_injectNow = function() {
+    injectTemplateForCurrentType();
+};
 ```
-
-### B. Checklist de Deploiement
-
-- [ ] Mode developpeur active sur Spira
-- [ ] SpiraApp uploade via System Admin
-- [ ] SpiraApp activee au niveau systeme
-- [ ] SpiraApp activee par produit
-- [ ] Templates configures dans Product Settings
-- [ ] Tests executes sur environnement de test
-- [ ] Logs de debug verifies
-- [ ] Documentation utilisateur fournie
-
-### C. URLs Utiles
-
-- **Spira Instance** : `https://demo-in.spiraservice.net/mtx`
-- **API REST** : `https://demo-in.spiraservice.net/mtx/Services/v7_0/RestService.svc`
-- **Projet Principal** : `https://demo-in.spiraservice.net/mtx/#/project/1`
-- **Admin SpiraApps** : `https://demo-in.spiraservice.net/mtx/Administration/SpiraApps.aspx`
 
 ---
 
-*Document cree le 2025-01-08*
+## 4. Maquettes Wireframes
+
+> **Note**: Les maquettes suivantes representent fidelement l'interface Spira avec tous les elements de navigation et les interactions utilisateur.
+
+---
+
+### 4.1 ADMINISTRATION - Liste des SpiraApps
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║  SpiraPlan v8.0                                                    [?] [⚙] [👤 Admin]║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                       ║
+║  ┌─────────────────┐                                                                  ║
+║  │ ADMINISTRATION  │                                                                  ║
+║  ├─────────────────┤                                                                  ║
+║  │ ▸ System        │   PRODUCT ADMINISTRATION > SPIRAAPPS                             ║
+║  │ ▾ Product       │   ═══════════════════════════════════════════                    ║
+║  │   ├─ General    │                                                                  ║
+║  │   ├─ Users      │   Manage SpiraApps for this product. SpiraApps extend            ║
+║  │   ├─ Planning   │   functionality and integrate with external services.            ║
+║  │   ├─ Workflows  │                                                                  ║
+║  │   ├─ Templates  │   ┌─────────────────────────────────────────────────────────┐    ║
+║  │   └─ SpiraApps ◀│   │ INSTALLED SPIRAAPPS                              [+ Add]│    ║
+║  └─────────────────┘   ├─────────────────────────────────────────────────────────┤    ║
+║                        │                                                         │    ║
+║                        │  ┌──────┐  Requirement Template Injector      v1.0.0   │    ║
+║                        │  │ RTI  │  ─────────────────────────────────────────   │    ║
+║                        │  │ ✓    │  Injecte des templates dans les champs       │    ║
+║                        │  └──────┘  RichText des exigences lors de leur         │    ║
+║                        │            creation.                                    │    ║
+║                        │                                                         │    ║
+║                        │            Status: [●] Active                           │    ║
+║                        │                                                         │    ║
+║                        │            [Configure]  [Disable]  [Remove]             │    ║
+║                        │                                                         │    ║
+║                        ├─────────────────────────────────────────────────────────┤    ║
+║                        │                                                         │    ║
+║                        │  ┌──────┐  Another SpiraApp                   v2.1.0   │    ║
+║                        │  │ APP  │  ─────────────────────────────────────────   │    ║
+║                        │  │      │  Description of another app...               │    ║
+║                        │  └──────┘                                               │    ║
+║                        │                                                         │    ║
+║                        └─────────────────────────────────────────────────────────┘    ║
+║                                                                                       ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+### 4.2 ADMINISTRATION - Configuration SpiraApp (Dropdown type + Template RichText)
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║  SpiraPlan v8.0                                                    [?] [⚙] [👤 Admin]║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                       ║
+║  PRODUCT ADMINISTRATION > SPIRAAPPS > REQUIREMENT TEMPLATE INJECTOR                   ║
+║  ════════════════════════════════════════════════════════════════════════════════     ║
+║                                                                                       ║
+║  ┌────────────────────────────────────────────────────────────────────────────────┐   ║
+║  │  ╔═══════════════════════════════════════════════════════════════════════════╗ │   ║
+║  │  ║  REQUIREMENT TEMPLATE INJECTOR                                    v1.0.0  ║ │   ║
+║  │  ║═══════════════════════════════════════════════════════════════════════════║ │   ║
+║  │  ║  Injecte automatiquement des templates HTML dans les descriptions des     ║ │   ║
+║  │  ║  requirements lors de leur creation. Configurez jusqu'a 5 types.          ║ │   ║
+║  │  ║                                                                           ║ │   ║
+║  │  ║  💡 Selectionnez un type dans la liste deroulante pour chaque slot        ║ │   ║
+║  │  ╚═══════════════════════════════════════════════════════════════════════════╝ │   ║
+║  │                                                                                │   ║
+║  │  ┌──────────────────────────────────────────────────────────────────────────┐  │   ║
+║  │  │  PRODUCT SETTINGS - CONFIGURATION DES TEMPLATES                          │  │   ║
+║  │  ├──────────────────────────────────────────────────────────────────────────┤  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  ╔════════════════════════════════════════════════════════════════════╗  │  │   ║
+║  │  │  ║  SLOT #1                                                           ║  │  │   ║
+║  │  │  ╚════════════════════════════════════════════════════════════════════╝  │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  Type d'exigence #1:  ┌──────────────────────────────────────────┐ [▼]  │  │   ║
+║  │  │                       │ Feature                                  │      │  │   ║
+║  │  │                       ├──────────────────────────────────────────┤      │  │   ║
+║  │  │                       │   Need                                   │      │  │   ║
+║  │  │                       │ ✓ Feature                                │      │  │   ║
+║  │  │                       │   Use Case                               │      │  │   ║
+║  │  │                       │   User Story                             │      │  │   ║
+║  │  │                       │   Quality                                │      │  │   ║
+║  │  │                       │   [Types custom du produit...]           │      │  │   ║
+║  │  │                       └──────────────────────────────────────────┘      │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  Template #1:                                                      [i]   │  │   ║
+║  │  │  ┌────────────────────────────────────────────────────────────────────┐  │  │   ║
+║  │  │  │ [B] [I] [U] [S] │ [🔗] [📷] │ [≡] [•] │ [📊] │ [</>] │    [⤢]     │  │  │   ║
+║  │  │  ├────────────────────────────────────────────────────────────────────┤  │  │   ║
+║  │  │  │                                                                    │  │  │   ║
+║  │  │  │  ┌─────────────────────────────────────────────────────────────┐   │  │  │   ║
+║  │  │  │  │ Description                                                 │   │  │  │   ║
+║  │  │  │  └─────────────────────────────────────────────────────────────┘   │  │  │   ║
+║  │  │  │  [Description detaillee de la fonctionnalite]                      │  │  │   ║
+║  │  │  │                                                                    │  │  │   ║
+║  │  │  │  ┌─────────────────────────────────────────────────────────────┐   │  │  │   ║
+║  │  │  │  │ Regles de Gestion                                           │   │  │  │   ║
+║  │  │  │  └─────────────────────────────────────────────────────────────┘   │  │  │   ║
+║  │  │  │  • RG01: [Regle 1]                                                 │  │  │   ║
+║  │  │  │  • RG02: [Regle 2]                                                 │  │  │   ║
+║  │  │  │                                                                    │  │  │   ║
+║  │  │  │  ┌─────────────────────────────────────────────────────────────┐   │  │  │   ║
+║  │  │  │  │ Criteres d'Acceptation                                      │   │  │  │   ║
+║  │  │  │  └─────────────────────────────────────────────────────────────┘   │  │  │   ║
+║  │  │  │  ☐ Critere 1                                                       │  │  │   ║
+║  │  │  │  ☐ Critere 2                                                       │  │  │   ║
+║  │  │  │                                                                    │  │  │   ║
+║  │  │  └────────────────────────────────────────────────────────────────────┘  │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  ────────────────────────────────────────────────────────────────────    │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  ╔════════════════════════════════════════════════════════════════════╗  │  │   ║
+║  │  │  ║  SLOT #2                                                           ║  │  │   ║
+║  │  │  ╚════════════════════════════════════════════════════════════════════╝  │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  Type d'exigence #2:  ┌──────────────────────────────────────────┐ [▼]  │  │   ║
+║  │  │                       │ User Story                               │      │  │   ║
+║  │  │                       └──────────────────────────────────────────┘      │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  Template #2:                                                      [i]   │  │   ║
+║  │  │  ┌────────────────────────────────────────────────────────────────────┐  │  │   ║
+║  │  │  │ [B] [I] [U] [S] │ [🔗] [📷] │ [≡] [•] │ [📊] │ [</>] │    [⤢]     │  │  │   ║
+║  │  │  ├────────────────────────────────────────────────────────────────────┤  │  │   ║
+║  │  │  │                                                                    │  │  │   ║
+║  │  │  │  **En tant que** [type d'utilisateur]                              │  │  │   ║
+║  │  │  │  **Je veux** [fonctionnalite souhaitee]                            │  │  │   ║
+║  │  │  │  **Afin de** [benefice/valeur]                                     │  │  │   ║
+║  │  │  │                                                                    │  │  │   ║
+║  │  │  │  Criteres d'acceptation:                                           │  │  │   ║
+║  │  │  │  • Etant donne [contexte], quand [action], alors [resultat]        │  │  │   ║
+║  │  │  │                                                                    │  │  │   ║
+║  │  │  └────────────────────────────────────────────────────────────────────┘  │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  └──────────────────────────────────────────────────────────────────────────┘  │   ║
+║  │                                                                                │   ║
+║  │                                     [Scroll down for slots 3, 4, 5...]         │   ║
+║  │                                                                                │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+### 4.3 ADMINISTRATION - Configuration SpiraApp (Suite - Slots 3, 4, 5 + Options)
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║  SpiraPlan v8.0                                                    [?] [⚙] [👤 Admin]║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                       ║
+║  PRODUCT ADMINISTRATION > SPIRAAPPS > REQUIREMENT TEMPLATE INJECTOR (suite)           ║
+║  ════════════════════════════════════════════════════════════════════════════════     ║
+║                                                                                       ║
+║  ┌────────────────────────────────────────────────────────────────────────────────┐   ║
+║  │                                                                                │   ║
+║  │  ╔════════════════════════════════════════════════════════════════════════╗   │   ║
+║  │  ║  SLOT #3                                                               ║   │   ║
+║  │  ╚════════════════════════════════════════════════════════════════════════╝   │   ║
+║  │                                                                                │   ║
+║  │  Type d'exigence #3:  ┌────────────────────────────────────────────┐ [▼]      │   ║
+║  │                       │ Need                                       │          │   ║
+║  │                       └────────────────────────────────────────────┘          │   ║
+║  │                                                                                │   ║
+║  │  Template #3:                                                           [i]   │   ║
+║  │  ┌────────────────────────────────────────────────────────────────────────┐   │   ║
+║  │  │ [B] [I] [U] [S] │ [🔗] [📷] │ [≡] [•] │ [📊] │ [</>] │    [⤢]        │   │   ║
+║  │  ├────────────────────────────────────────────────────────────────────────┤   │   ║
+║  │  │  Contexte Metier: [...]                                                │   │   ║
+║  │  │  Description du Besoin: [...]                                          │   │   ║
+║  │  │  Benefices Attendus: • [...]                                           │   │   ║
+║  │  └────────────────────────────────────────────────────────────────────────┘   │   ║
+║  │                                                                                │   ║
+║  │  ────────────────────────────────────────────────────────────────────────────  │   ║
+║  │                                                                                │   ║
+║  │  ╔════════════════════════════════════════════════════════════════════════╗   │   ║
+║  │  ║  SLOT #4                                                               ║   │   ║
+║  │  ╚════════════════════════════════════════════════════════════════════════╝   │   ║
+║  │                                                                                │   ║
+║  │  Type d'exigence #4:  ┌────────────────────────────────────────────┐ [▼]      │   ║
+║  │                       │ -- Selectionner --                         │ ◀ VIDE   │   ║
+║  │                       └────────────────────────────────────────────┘          │   ║
+║  │                                                                                │   ║
+║  │  Template #4:                                                           [i]   │   ║
+║  │  ┌────────────────────────────────────────────────────────────────────────┐   │   ║
+║  │  │                        (Slot non utilise)                              │   │   ║
+║  │  └────────────────────────────────────────────────────────────────────────┘   │   ║
+║  │                                                                                │   ║
+║  │  ────────────────────────────────────────────────────────────────────────────  │   ║
+║  │                                                                                │   ║
+║  │  ╔════════════════════════════════════════════════════════════════════════╗   │   ║
+║  │  ║  SLOT #5                                                               ║   │   ║
+║  │  ╚════════════════════════════════════════════════════════════════════════╝   │   ║
+║  │                                                                                │   ║
+║  │  Type d'exigence #5:  ┌────────────────────────────────────────────┐ [▼]      │   ║
+║  │                       │ -- Selectionner --                         │ ◀ VIDE   │   ║
+║  │                       └────────────────────────────────────────────┘          │   ║
+║  │                                                                                │   ║
+║  │  Template #5:                                                           [i]   │   ║
+║  │  ┌────────────────────────────────────────────────────────────────────────┐   │   ║
+║  │  │                        (Slot non utilise)                              │   │   ║
+║  │  └────────────────────────────────────────────────────────────────────────┘   │   ║
+║  │                                                                                │   ║
+║  │  ════════════════════════════════════════════════════════════════════════════  │   ║
+║  │                                                                                │   ║
+║  │  OPTIONS AVANCEES                                                              │   ║
+║  │  ┌────────────────────────────────────────────────────────────────────────┐   │   ║
+║  │  │                                                                        │   │   ║
+║  │  │  Mode debug:  [☐]                                                      │   │   ║
+║  │  │               Affiche les logs dans la console navigateur (F12)        │   │   ║
+║  │  │                                                                        │   │   ║
+║  │  └────────────────────────────────────────────────────────────────────────┘   │   ║
+║  │                                                                                │   ║
+║  │  ┌────────────────────────────────────────────────────────────────────────┐   │   ║
+║  │  │  💡 COMMENT CA MARCHE                                                  │   │   ║
+║  │  │  ─────────────────────────────────────────                             │   │   ║
+║  │  │  1. Selectionnez un type d'exigence dans la liste deroulante           │   │   ║
+║  │  │  2. Configurez le template HTML dans l'editeur RichText                │   │   ║
+║  │  │  3. Le template sera injecte a la creation d'une exigence de ce type   │   │   ║
+║  │  │                                                                        │   │   ║
+║  │  │  La liste inclut tous les types standards + vos types personnalises    │   │   ║
+║  │  └────────────────────────────────────────────────────────────────────────┘   │   ║
+║  │                                                                                │   ║
+║  │                                    [  Annuler  ]    [  Sauvegarder  ]          │   ║
+║  │                                                                                │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+### 4.4 INTERFACE UTILISATEUR - Nouvelle Exigence (Etape 1: Ouverture)
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║  SpiraPlan v8.0                                                 [?] [⚙] [👤 JDupont]║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║  [Projects ▾]  [Artifacts ▾]  [Reports ▾]  [Documents ▾]  [Admin ▾]                  ║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                       ║
+║  📁 My Project > Requirements > RQ:??? (New)                                          ║
+║  ══════════════════════════════════════════                                           ║
+║                                                                                       ║
+║  ┌────────────────────────────────────────────────────────────────────────────────┐   ║
+║  │ [💾 Save] [💾 Save & New] [↩ Undo] [🗑 Delete] [⋮ More ▾]                       │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+║  ┌─ GENERAL ──────────────────────────────────────────────────────────────────────┐   ║
+║  │                                                                                │   ║
+║  │  Name*:        ┌────────────────────────────────────────────────────────────┐  │   ║
+║  │                │                                                            │  │   ║
+║  │                └────────────────────────────────────────────────────────────┘  │   ║
+║  │                                                                                │   ║
+║  │  Type*:        ┌────────────────────────────────────────────┐                  │   ║
+║  │                │ Feature                                  ▾ │ ◀── TYPE DEFAUT │   ║
+║  │                └────────────────────────────────────────────┘                  │   ║
+║  │                                                                                │   ║
+║  │  Status*:      ┌────────────────────────────────────────────┐                  │   ║
+║  │                │ Requested                                ▾ │                  │   ║
+║  │                └────────────────────────────────────────────┘                  │   ║
+║  │                                                                                │   ║
+║  │  Importance:   ┌────────────────────────────────────────────┐                  │   ║
+║  │                │ -- None --                               ▾ │                  │   ║
+║  │                └────────────────────────────────────────────┘                  │   ║
+║  │                                                                                │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+║  ┌─ DESCRIPTION ──────────────────────────────────────────────────────────────────┐   ║
+║  │                                                                                │   ║
+║  │  ┌──────────────────────────────────────────────────────────────────────────┐  │   ║
+║  │  │ [B] [I] [U] [S] │ [🔗 Link] [📷 Image] │ [≡] [•] [1.] │ [📊] │ [</>]    │  │   ║
+║  │  ├──────────────────────────────────────────────────────────────────────────┤  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  ╔════════════════════════════════════════════════════════════════════╗  │  │   ║
+║  │  │  ║                        Description                                 ║  │  │   ║
+║  │  │  ╚════════════════════════════════════════════════════════════════════╝  │  │   ║
+║  │  │  [Description detaillee de la fonctionnalite]                            │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  ╔════════════════════════════════════════════════════════════════════╗  │  │   ║
+║  │  │  ║                      Regles de Gestion                             ║  │  │   ║
+║  │  │  ╚════════════════════════════════════════════════════════════════════╝  │  │   ║
+║  │  │  • RG01: [Regle 1]                                                       │  │   ║
+║  │  │  • RG02: [Regle 2]                                                       │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  ╔════════════════════════════════════════════════════════════════════╗  │  │   ║
+║  │  │  ║                    Criteres d'Acceptation                          ║  │  │   ║
+║  │  │  ╚════════════════════════════════════════════════════════════════════╝  │  │   ║
+║  │  │  ☐ Critere 1                                                             │  │   ║
+║  │  │  ☐ Critere 2                                                             │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  └──────────────────────────────────────────────────────────────────────────┘  │   ║
+║  │       ▲                                                                        │   ║
+║  │       │                                                                        │   ║
+║  │       └──── 🎯 TEMPLATE "FEATURE" INJECTE AUTOMATIQUEMENT PAR RTI !            │   ║
+║  │                                                                                │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+### 4.5 INTERFACE UTILISATEUR - Changement de Type (User Story)
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║  SpiraPlan v8.0                                                 [?] [⚙] [👤 JDupont]║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║  [Projects ▾]  [Artifacts ▾]  [Reports ▾]  [Documents ▾]  [Admin ▾]                  ║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                       ║
+║  📁 My Project > Requirements > RQ:??? (New)                                          ║
+║  ══════════════════════════════════════════                                           ║
+║                                                                                       ║
+║  ┌────────────────────────────────────────────────────────────────────────────────┐   ║
+║  │ [💾 Save] [💾 Save & New] [↩ Undo] [🗑 Delete] [⋮ More ▾]                       │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+║  ┌─ GENERAL ──────────────────────────────────────────────────────────────────────┐   ║
+║  │                                                                                │   ║
+║  │  Name*:        ┌────────────────────────────────────────────────────────────┐  │   ║
+║  │                │ Gestion des notifications utilisateur                      │  │   ║
+║  │                └────────────────────────────────────────────────────────────┘  │   ║
+║  │                                                                                │   ║
+║  │  Type*:        ┌────────────────────────────────────────────┐                  │   ║
+║  │                │ User Story                               ▾ │ ◀── CHANGE !    │   ║
+║  │                ├────────────────────────────────────────────┤                  │   ║
+║  │                │   Need                                     │                  │   ║
+║  │                │ ✓ Feature                                  │                  │   ║
+║  │                │   Use Case                                 │                  │   ║
+║  │                │ ► User Story ◀─────────────────────────────│─ SELECTIONNE    │   ║
+║  │                │   Quality                                  │                  │   ║
+║  │                │   Epic                                     │                  │   ║
+║  │                └────────────────────────────────────────────┘                  │   ║
+║  │                                                                                │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+║                            ┌──────────────────────────────────┐                       ║
+║                            │  🔄 RTI: Re-injection en cours   │                       ║
+║                            │     Template -> User Story       │                       ║
+║                            └──────────────────────────────────┘                       ║
+║                                          │                                            ║
+║                                          ▼                                            ║
+║  ┌─ DESCRIPTION ──────────────────────────────────────────────────────────────────┐   ║
+║  │                                                                                │   ║
+║  │  ┌──────────────────────────────────────────────────────────────────────────┐  │   ║
+║  │  │ [B] [I] [U] [S] │ [🔗 Link] [📷 Image] │ [≡] [•] [1.] │ [📊] │ [</>]    │  │   ║
+║  │  ├──────────────────────────────────────────────────────────────────────────┤  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  **En tant que** [type d'utilisateur]                                    │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  **Je veux** [fonctionnalite souhaitee]                                  │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  **Afin de** [benefice/valeur]                                           │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  ╔════════════════════════════════════════════════════════════════════╗  │  │   ║
+║  │  │  ║                    Criteres d'acceptation                          ║  │  │   ║
+║  │  │  ╚════════════════════════════════════════════════════════════════════╝  │  │   ║
+║  │  │  • Etant donne [contexte], quand [action], alors [resultat]              │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  ╔════════════════════════════════════════════════════════════════════╗  │  │   ║
+║  │  │  ║                      Notes techniques                              ║  │  │   ║
+║  │  │  ╚════════════════════════════════════════════════════════════════════╝  │  │   ║
+║  │  │  [Notes pour l'equipe technique]                                         │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  └──────────────────────────────────────────────────────────────────────────┘  │   ║
+║  │       ▲                                                                        │   ║
+║  │       │                                                                        │   ║
+║  │       └──── 🎯 NOUVEAU TEMPLATE "USER STORY" INJECTE !                         │   ║
+║  │                                                                                │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+### 4.6 INTERFACE UTILISATEUR - Contenu Modifie (Protection)
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║  SpiraPlan v8.0                                                 [?] [⚙] [👤 JDupont]║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                       ║
+║  📁 My Project > Requirements > RQ:??? (New)                                          ║
+║  ══════════════════════════════════════════                                           ║
+║                                                                                       ║
+║  ┌─ GENERAL ──────────────────────────────────────────────────────────────────────┐   ║
+║  │                                                                                │   ║
+║  │  Name*:        ┌────────────────────────────────────────────────────────────┐  │   ║
+║  │                │ Gestion des notifications utilisateur                      │  │   ║
+║  │                └────────────────────────────────────────────────────────────┘  │   ║
+║  │                                                                                │   ║
+║  │  Type*:        ┌────────────────────────────────────────────┐                  │   ║
+║  │                │ User Story                               ▾ │                  │   ║
+║  │                └────────────────────────────────────────────┘                  │   ║
+║  │                     │                                                          │   ║
+║  │                     │ L'utilisateur change en "Need"                           │   ║
+║  │                     ▼                                                          │   ║
+║  │                ┌────────────────────────────────────────────┐                  │   ║
+║  │                │ Need                                     ▾ │                  │   ║
+║  │                └────────────────────────────────────────────┘                  │   ║
+║  │                                                                                │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+║  ┌─ DESCRIPTION ──────────────────────────────────────────────────────────────────┐   ║
+║  │                                                                                │   ║
+║  │  ┌──────────────────────────────────────────────────────────────────────────┐  │   ║
+║  │  │ [B] [I] [U] [S] │ [🔗 Link] [📷 Image] │ [≡] [•] [1.] │ [📊] │ [</>]    │  │   ║
+║  │  ├──────────────────────────────────────────────────────────────────────────┤  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  **En tant que** administrateur systeme    ◀── MODIFIE PAR L'UTILISATEUR │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  **Je veux** recevoir des alertes en temps reel   ◀── MODIFIE            │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  **Afin de** reagir rapidement aux incidents      ◀── MODIFIE            │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  ╔════════════════════════════════════════════════════════════════════╗  │  │   ║
+║  │  │  ║                    Criteres d'acceptation                          ║  │  │   ║
+║  │  │  ╚════════════════════════════════════════════════════════════════════╝  │  │   ║
+║  │  │  • Etant donne un incident critique, quand il se produit,                │  │   ║
+║  │  │    alors l'admin recoit une notification sous 30 secondes                │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  └──────────────────────────────────────────────────────────────────────────┘  │   ║
+║  │       ▲                                                                        │   ║
+║  │       │                                                                        │   ║
+║  │       └──── 🛡️ CONTENU PRESERVE ! RTI detecte que l'utilisateur a modifie     │   ║
+║  │             le template. Pas de re-injection meme si le type change.          │   ║
+║  │                                                                                │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+║  ┌─ Console (F12) ────────────────────────────────────────────────────────────────┐   ║
+║  │  > [RTI] [DEBUG] Type changed {from: 4, to: 1}                                 │   ║
+║  │  > [RTI] [DEBUG] Content modified by user, skipping injection                  │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+### 4.7 INTERFACE UTILISATEUR - Mode Edition (Pas d'injection)
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║  SpiraPlan v8.0                                                 [?] [⚙] [👤 JDupont]║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                       ║
+║  📁 My Project > Requirements > RQ:1234                     ◀── REQUIREMENT EXISTANT ║
+║  ══════════════════════════════════════════                                           ║
+║                                                                                       ║
+║  ┌────────────────────────────────────────────────────────────────────────────────┐   ║
+║  │ [💾 Save] [💾 Save & New] [↩ Undo] [🗑 Delete] [⋮ More ▾]                       │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+║  ┌─ GENERAL ──────────────────────────────────────────────────────────────────────┐   ║
+║  │                                                                                │   ║
+║  │  Name*:        ┌────────────────────────────────────────────────────────────┐  │   ║
+║  │                │ Fonctionnalite de recherche avancee                        │  │   ║
+║  │                └────────────────────────────────────────────────────────────┘  │   ║
+║  │                                                                                │   ║
+║  │  Type*:        ┌────────────────────────────────────────────┐                  │   ║
+║  │                │ Feature                                  ▾ │                  │   ║
+║  │                └────────────────────────────────────────────┘                  │   ║
+║  │                                                                                │   ║
+║  │  Status*:      ┌────────────────────────────────────────────┐                  │   ║
+║  │                │ In Progress                              ▾ │                  │   ║
+║  │                └────────────────────────────────────────────┘                  │   ║
+║  │                                                                                │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+║  ┌─ DESCRIPTION ──────────────────────────────────────────────────────────────────┐   ║
+║  │                                                                                │   ║
+║  │  ┌──────────────────────────────────────────────────────────────────────────┐  │   ║
+║  │  │ [B] [I] [U] [S] │ [🔗 Link] [📷 Image] │ [≡] [•] [1.] │ [📊] │ [</>]    │  │   ║
+║  │  ├──────────────────────────────────────────────────────────────────────────┤  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  Cette fonctionnalite permet aux utilisateurs de rechercher des          │  │   ║
+║  │  │  documents en utilisant des filtres avances comme:                       │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  • Type de document                                                      │  │   ║
+║  │  │  • Date de creation                                                      │  │   ║
+║  │  │  • Auteur                                                                │  │   ║
+║  │  │  • Tags                                                                  │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  │  Le resultat sera affiche dans une liste paginee avec tri.               │  │   ║
+║  │  │                                                                          │  │   ║
+║  │  └──────────────────────────────────────────────────────────────────────────┘  │   ║
+║  │       ▲                                                                        │   ║
+║  │       │                                                                        │   ║
+║  │       └──── 📝 CONTENU EXISTANT - RTI ne fait RIEN en mode edition             │   ║
+║  │             car spiraAppManager.artifactId = 1234 (existe)                     │   ║
+║  │                                                                                │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+║  ┌─ Console (F12) ────────────────────────────────────────────────────────────────┐   ║
+║  │  > [RTI] [DEBUG] Page loaded                                                   │   ║
+║  │  > [RTI] [DEBUG] Edit mode (artifactId exists), skipping                       │   ║
+║  └────────────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                       ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+### 4.8 CONSOLE DEBUG (F12) - Logs Complets
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║  DevTools - Console                                               [×]                ║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║  Filter: [RTI                                    ]  [All levels ▾]  [🔍]             ║
+╠══════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                       ║
+║  ▶ [RTI] [INFO] Initializing RTI v1.0.0                                              ║
+║  ▶ [RTI] [DEBUG] Template loaded for type 1                                          ║
+║  ▶ [RTI] [DEBUG] Template loaded for type 2                                          ║
+║  ▶ [RTI] [DEBUG] Template loaded for type 3                                          ║
+║  ▶ [RTI] [DEBUG] Template loaded for type 4                                          ║
+║  ▶ [RTI] [DEBUG] Templates loaded ▶ (4) ["1", "2", "3", "4"]                         ║
+║  ▶ [RTI] [INFO] Event handlers registered                                            ║
+║                                                                                       ║
+║  ──────────────────────── Page chargee ────────────────────────                       ║
+║                                                                                       ║
+║  ▶ [RTI] [DEBUG] Page loaded                                                         ║
+║  ▶ [RTI] [DEBUG] Creation mode detected                                              ║
+║  ▶ [RTI] [DEBUG] Current type: 2                                                     ║
+║  ▶ [RTI] [INFO] Injecting template for type 2                                        ║
+║                                                                                       ║
+║  ──────────────────────── Type change: Feature -> User Story ────────────────────    ║
+║                                                                                       ║
+║  ▶ [RTI] [DEBUG] Type changed ▶ {from: 2, to: 4}                                     ║
+║  ▶ [RTI] [DEBUG] Current type: 4                                                     ║
+║  ▶ [RTI] [INFO] Injecting template for type 4                                        ║
+║                                                                                       ║
+║  ──────────────────────── Type change: User Story -> Need (contenu modifie) ─────    ║
+║                                                                                       ║
+║  ▶ [RTI] [DEBUG] Type changed ▶ {from: 4, to: 1}                                     ║
+║  ▶ [RTI] [DEBUG] Content modified by user, skipping injection                        ║
+║                                                                                       ║
+║  ──────────────────────── Debug helpers ────────────────────────                      ║
+║                                                                                       ║
+║  > RTI_showState()                                                                    ║
+║  ◀ ▶ {settings: {...}, templates: {...}, lastInjectedTemplate: "...", debug: true}   ║
+║                                                                                       ║
+║  > RTI_showTemplates()                                                                ║
+║  ◀ ▶ {1: "<h2>Contexte...", 2: "<h2>Description...", 4: "<p><strong>En tant..."}     ║
+║                                                                                       ║
+║  > RTI_injectNow()                                                                    ║
+║  ◀ undefined                                                                          ║
+║  ▶ [RTI] [DEBUG] Current type: 1                                                     ║
+║  ▶ [RTI] [INFO] Injecting template for type 1                                        ║
+║                                                                                       ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+### 4.9 RESUME VISUEL - Flux Complet
+
+```text
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║                         FLUX D'UTILISATION RTI                                        ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+
+    ┌─────────────────┐
+    │  ADMIN CONFIG   │
+    │  (une seule     │
+    │   fois)         │
+    └────────┬────────┘
+             │
+             ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  Product Admin > SpiraApps > RTI > Configure                │
+    │                                                             │
+    │  ┌─────────────────┐  ┌─────────────────┐                   │
+    │  │ Template Need   │  │ Template Feature│  ...              │
+    │  │ [RichText Edit] │  │ [RichText Edit] │                   │
+    │  └─────────────────┘  └─────────────────┘                   │
+    │                                                             │
+    │                              [Save]                         │
+    └─────────────────────────────────────────────────────────────┘
+             │
+             │ Templates sauvegardes
+             ▼
+    ┌─────────────────┐
+    │  UTILISATEUR    │
+    │  (quotidien)    │
+    └────────┬────────┘
+             │
+             ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │  Requirements > [+ New]                                     │
+    └─────────────────────────────────────────────────────────────┘
+             │
+             │ registerEvent_loaded()
+             ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │                                                             │
+    │   Type: [Feature ▾]     ◀── Type par defaut                 │
+    │                                                             │
+    │   Description:                                              │
+    │   ┌─────────────────────────────────────────────────────┐   │
+    │   │  ## Description                                     │   │
+    │   │  [Description detaillee...]        ◀── TEMPLATE     │   │
+    │   │                                        INJECTE!     │   │
+    │   │  ## Regles de Gestion                               │   │
+    │   │  • RG01: [...]                                      │   │
+    │   └─────────────────────────────────────────────────────┘   │
+    │                                                             │
+    └─────────────────────────────────────────────────────────────┘
+             │
+             │ L'utilisateur peut:
+             │
+    ┌────────┴────────┬────────────────────┐
+    │                 │                    │
+    ▼                 ▼                    ▼
+┌──────────┐   ┌─────────────┐   ┌────────────────┐
+│ MODIFIER │   │ CHANGER     │   │ SAUVEGARDER    │
+│ contenu  │   │ le TYPE     │   │ directement    │
+└────┬─────┘   └──────┬──────┘   └────────────────┘
+     │                │
+     │                │ registerEvent_dropdownChanged()
+     │                ▼
+     │         ┌──────────────────────────────────────────┐
+     │         │ Type: [User Story ▾]                     │
+     │         │                                          │
+     │         │ Description:                             │
+     │         │ ┌────────────────────────────────────┐   │
+     │         │ │ **En tant que** [...]              │   │
+     │         │ │ **Je veux** [...]     ◀── NOUVEAU  │   │
+     │         │ │ **Afin de** [...]         TEMPLATE │   │
+     │         │ └────────────────────────────────────┘   │
+     │         └──────────────────────────────────────────┘
+     │
+     │ Si contenu modifie:
+     ▼
+┌──────────────────────────────────────────────────────────┐
+│  🛡️ PROTECTION: Le contenu modifie est PRESERVE          │
+│     meme si l'utilisateur change le type ensuite        │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 5. Cas de Test
+
+### CT-001 : Injection au Chargement - Type par Defaut
+
+| Attribut | Valeur |
+| -------- | ------ |
+| **ID** | CT-001 |
+| **Exigences** | EF-001, EF-003, EF-004 |
+| **Preconditions** | SpiraApp activee, template configure pour type 2 (Feature) |
+| **Etapes** | 1. Naviguer vers Requirements > New |
+| **Resultat attendu** | Template "Feature" visible immediatement dans Description |
+| **Verification** | Le formulaire s'ouvre avec Description pre-remplie |
+
+---
+
+### CT-002 : Re-injection au Changement de Type
+
+| Attribut | Valeur |
+| -------- | ------ |
+| **ID** | CT-002 |
+| **Exigences** | EF-002, EF-004 |
+| **Preconditions** | Templates configures pour types 2 et 4 |
+| **Etapes** | 1. Creer nouveau requirement (template Feature affiche) |
+|  | 2. Changer type en "User Story" (4) |
+| **Resultat attendu** | Template "User Story" remplace le template "Feature" |
+
+---
+
+### CT-003 : Mode Edition - Pas d'Injection
+
+| Attribut | Valeur |
+| -------- | ------ |
+| **ID** | CT-003 |
+| **Exigences** | EF-003 |
+| **Preconditions** | Requirement existant |
+| **Etapes** | 1. Ouvrir un requirement existant |
+| **Resultat attendu** | Description inchangee, pas d'injection |
+
+---
+
+### CT-004 : Protection Contenu Modifie
+
+| Attribut | Valeur |
+| -------- | ------ |
+| **ID** | CT-004 |
+| **Exigences** | EF-005 |
+| **Preconditions** | Creation en cours avec template Feature |
+| **Etapes** | 1. Modifier manuellement le contenu Description |
+|  | 2. Changer le type en User Story |
+| **Resultat attendu** | Contenu modifie preserve, pas de re-injection |
+
+---
+
+### CT-005 : Type sans Template
+
+| Attribut | Valeur |
+| -------- | ------ |
+| **ID** | CT-005 |
+| **Exigences** | EF-004 |
+| **Preconditions** | Pas de template configure pour type 26 (Epic) |
+| **Etapes** | 1. Creer nouveau requirement |
+|  | 2. Changer type en "Epic" |
+| **Resultat attendu** | Description devient vide (ou garde l'ancien si modifie) |
+
+---
+
+### CT-006 : Configuration RichText Vide
+
+| Attribut | Valeur |
+| -------- | ------ |
+| **ID** | CT-006 |
+| **Exigences** | EF-004 |
+| **Preconditions** | Champ RichText template_need vide dans settings |
+| **Etapes** | 1. Creer requirement de type Need |
+| **Resultat attendu** | Description reste vide |
+
+---
+
+### CT-007 : Debug Mode Console
+
+| Attribut | Valeur |
+| -------- | ------ |
+| **ID** | CT-007 |
+| **Exigences** | EF-006, ENF-003 |
+| **Preconditions** | debug_mode = true dans settings |
+| **Etapes** | 1. Ouvrir console (F12) |
+|  | 2. Creer nouveau requirement |
+| **Resultat attendu** | Logs [RTI] visibles dans console |
+
+---
+
+### CT-008 : Plusieurs Changements de Type
+
+| Attribut | Valeur |
+| -------- | ------ |
+| **ID** | CT-008 |
+| **Exigences** | EF-002, EF-005 |
+| **Etapes** | 1. Nouveau requirement (Feature) |
+|  | 2. Changer en User Story -> template US |
+|  | 3. Changer en Need -> template Need |
+|  | 4. Changer en Feature -> template Feature |
+| **Resultat attendu** | Chaque changement injecte le bon template |
+
+---
+
+## 6. Catalogue des Erreurs
+
+### ERR-001 : Settings Non Disponibles
+
+| Code | ERR-001 |
+| ---- | ------- |
+| **Condition** | `SpiraAppSettings[APP_GUID]` est undefined |
+| **Cause probable** | SpiraApp non activee pour ce produit |
+| **Message console** | `[RTI] [WARN] Settings not available, RTI disabled` |
+| **Action** | Activer la SpiraApp dans Product Admin > SpiraApps |
+
+---
+
+### ERR-002 : Aucun Template Configure
+
+| Code | ERR-002 |
+| ---- | ------- |
+| **Condition** | Tous les champs RichText templates sont vides |
+| **Message console** | `[RTI] [DEBUG] Templates loaded []` |
+| **Impact** | RTI actif mais aucune injection |
+| **Action** | Configurer au moins un template dans Product Settings |
+
+---
+
+### ERR-003 : Template Non Trouve pour Type
+
+| Code | ERR-003 |
+| ---- | ------- |
+| **Condition** | Pas de template pour le RequirementTypeId selectionne |
+| **Message console** | `[RTI] [INFO] No template for type X` |
+| **Impact** | Comportement normal, pas d'injection pour ce type |
+
+---
+
+## 7. Roadmap
+
+| Phase | Description | Priorite | Statut |
+| ----- | ----------- | -------- | ------ |
+| v1.0 | Templates RichText par type + injection loaded/dropdown | Haute | En cours |
+| v1.1 | Support des champs Custom RichText | Moyenne | Planifie |
+| v1.2 | Selection du champ cible (settingTypeId: 7) | Moyenne | Planifie |
+| v1.3 | Import/Export des templates | Basse | Futur |
+
+---
+
+## 8. Annexes
+
+### 8.1 Templates Exemples Pre-configures
+
+#### Need (Type 1)
+
+```html
+<h2>Contexte Metier</h2>
+<p>[Decrire le contexte metier et les enjeux]</p>
+
+<h2>Description du Besoin</h2>
+<p>[Decrire le besoin fonctionnel]</p>
+
+<h2>Benefices Attendus</h2>
+<ul>
+    <li>[Benefice 1]</li>
+    <li>[Benefice 2]</li>
+</ul>
+
+<h2>Criteres d'Acceptation</h2>
+<ul>
+    <li>[ ] Critere 1</li>
+    <li>[ ] Critere 2</li>
+</ul>
+```
+
+#### Feature (Type 2) - Par defaut
+
+```html
+<h2>Description</h2>
+<p>[Description detaillee de la fonctionnalite]</p>
+
+<h2>Regles de Gestion</h2>
+<ul>
+    <li><strong>RG01:</strong> [Regle 1]</li>
+    <li><strong>RG02:</strong> [Regle 2]</li>
+</ul>
+
+<h2>Criteres d'Acceptation</h2>
+<ul>
+    <li>[ ] Critere 1</li>
+    <li>[ ] Critere 2</li>
+</ul>
+```
+
+#### User Story (Type 4)
+
+```html
+<p><strong>En tant que</strong> [type d'utilisateur]</p>
+<p><strong>Je veux</strong> [fonctionnalite souhaitee]</p>
+<p><strong>Afin de</strong> [benefice/valeur]</p>
+
+<h3>Criteres d'acceptation</h3>
+<ul>
+    <li>Etant donne [contexte], quand [action], alors [resultat]</li>
+</ul>
+
+<h3>Notes techniques</h3>
+<p>[Notes pour l'equipe technique]</p>
+```
+
+### 8.2 Matrice de Tracabilite
+
+| Exigence | Description | Cas de Test | API Utilisee |
+| -------- | ----------- | ----------- | ------------ |
+| EF-001 | Injection au chargement | CT-001 | `registerEvent_loaded` |
+| EF-002 | Re-injection au changement type | CT-002, CT-008 | `registerEvent_dropdownChanged` |
+| EF-003 | Detection mode creation | CT-001, CT-003 | `spiraAppManager.artifactId` |
+| EF-004 | Config RichText par type | CT-001, CT-005, CT-006 | `settingTypeId: 2` |
+| EF-005 | Protection contenu modifie | CT-004 | `getDataItemField` |
+| EF-006 | Mode debug | CT-007 | `settingTypeId: 10` |
+
+### 8.3 Avantages de cette Approche
+
+1. **UX Superieure** : L'utilisateur voit le template immediatement
+2. **Configuration Intuitive** : Editeurs RichText visuels, pas de JSON
+3. **Code Simple** : Pas de timing async complexe
+4. **Flexible** : Re-injection automatique au changement de type
+5. **Robuste** : Protection contre l'ecrasement du contenu modifie
+
+---
+
+*Document genere le 2026-01-14*
+*Version 5.0 - Approche API dynamique + Slots (nom type texte + template RichText)*

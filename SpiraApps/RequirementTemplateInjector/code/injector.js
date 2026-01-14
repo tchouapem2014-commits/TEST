@@ -1,176 +1,215 @@
 /**
- * REQUIREMENT TEMPLATE INJECTOR (RTI) - Version 1.0.0
+ * REQUIREMENT TEMPLATE INJECTOR (RTI)
+ * Version 1.0.0
+ *
+ * Approche: loaded + dropdownChanged
+ * Configuration: 5 SLOTS (dropdown type natif + template RichText)
+ * Le dropdown retourne directement le RequirementTypeId - pas besoin d'API
  */
 
-var RTI_GUID = 'b3f5a8d2-7c41-4e9a-b6d8-1f2e3a4b5c6d';
+// ============================================================
+// CONSTANTES
+// ============================================================
+var RTI_VERSION = "1.0.0";
+var RTI_PREFIX = "[RTI]";
+var RTI_GUID = "b3f5a8d2-7c41-4e9a-b6d8-1f2e3a4b5c6d";
+var NUM_SLOTS = 5;
 
-var DEFAULT_TEMPLATES = {
-    "1": { "name": "Need", "template": "<h2>Context</h2>\n<p>[Describe the business context]</p>\n\n<h2>Objective</h2>\n<p>[Describe the objective]</p>\n\n<h2>Expected Benefits</h2>\n<ul>\n<li>[Benefit 1]</li>\n<li>[Benefit 2]</li>\n</ul>" },
-    "2": { "name": "Feature", "template": "<h2>Description</h2>\n<p>[Describe the feature]</p>\n\n<h2>Business Rules</h2>\n<ul>\n<li><strong>BR01</strong>: [Rule 1]</li>\n<li><strong>BR02</strong>: [Rule 2]</li>\n</ul>\n\n<h2>Acceptance Criteria</h2>\n<ul>\n<li>[ ] Criteria 1</li>\n<li>[ ] Criteria 2</li>\n</ul>" },
-    "3": { "name": "Use Case", "template": "<h2>Actors</h2>\n<p>[List the actors]</p>\n\n<h2>Preconditions</h2>\n<ul>\n<li>[Precondition 1]</li>\n</ul>\n\n<h2>Main Flow</h2>\n<ol>\n<li>[Step 1]</li>\n<li>[Step 2]</li>\n<li>[Step 3]</li>\n</ol>\n\n<h2>Postconditions</h2>\n<ul>\n<li>[Postcondition 1]</li>\n</ul>" },
-    "4": { "name": "User Story", "template": "<h2>User Story</h2>\n<p><strong>As a</strong> [user role],</p>\n<p><strong>I want</strong> [action],</p>\n<p><strong>So that</strong> [benefit].</p>\n\n<h2>Acceptance Criteria</h2>\n<ul>\n<li>[ ] <strong>GIVEN</strong> [context]</li>\n<li>[ ] <strong>WHEN</strong> [action]</li>\n<li>[ ] <strong>THEN</strong> [result]</li>\n</ul>" },
-    "5": { "name": "Quality", "template": "<h2>Quality Requirement</h2>\n<p>[Describe non-functional requirement]</p>\n\n<h2>Measurable Criteria</h2>\n<ul>\n<li><strong>Metric</strong>: [name]</li>\n<li><strong>Target</strong>: [value]</li>\n</ul>" }
+// ============================================================
+// ETAT
+// ============================================================
+var state = {
+    settings: null,
+    templates: {},           // Map: typeId (string) -> template HTML
+    lastInjectedTemplate: "",
+    debugMode: false
 };
 
-var RTI_STATE = {
-    isNewRequirement: false,
-    lastInjectedTypeId: null,
-    config: { enabled: false, templates: {}, customFields: [], skipIfNotEmpty: true, debugMode: false }
-};
-
-var RTI_DEBUG_ENABLED = false;
-
-function rtiLog(msg, data) {
-    if (RTI_DEBUG_ENABLED) {
-        if (data) { console.log('[RTI]', msg, data); }
-        else { console.log('[RTI]', msg); }
-    }
-}
-
-// Start
-rtiInit();
-
-function rtiInit() {
-    rtiLog('Initializing RTI v1.0.0');
-    spiraAppManager.registerEvent_loaded(function() {
-        rtiLog('Page loaded');
-        rtiOnPageLoaded();
-    });
-}
-
-function rtiOnPageLoaded() {
-    // Load settings from SpiraAppSettings
-    if (!SpiraAppSettings || !SpiraAppSettings[RTI_GUID]) {
-        rtiLog('SpiraAppSettings not available');
-        return;
-    }
-
-    var settings = SpiraAppSettings[RTI_GUID];
-    rtiLog('Settings', settings);
-
-    // Check enabled
-    RTI_STATE.config.enabled = (settings.enabled === true || settings.enabled === 'Y');
-    if (!RTI_STATE.config.enabled) {
-        rtiLog('SpiraApp disabled');
-        return;
-    }
-
-    // Debug mode
-    RTI_DEBUG_ENABLED = (settings.debug_mode === true || settings.debug_mode === 'Y');
-    rtiLog('Debug mode: ' + RTI_DEBUG_ENABLED);
-
-    // Templates
-    if (settings.templates_config && settings.templates_config.trim() !== '') {
-        try {
-            RTI_STATE.config.templates = JSON.parse(settings.templates_config);
-        } catch (e) {
-            rtiLog('JSON parse error', e);
-            RTI_STATE.config.templates = DEFAULT_TEMPLATES;
-        }
+// ============================================================
+// LOGGING
+// ============================================================
+function log(level, message, data) {
+    if (!state.debugMode && level !== "ERROR") return;
+    var prefix = RTI_PREFIX + " [" + level + "]";
+    if (data !== undefined) {
+        console.log(prefix, message, data);
     } else {
-        RTI_STATE.config.templates = DEFAULT_TEMPLATES;
-    }
-
-    // Custom fields
-    if (settings.custom_fields && settings.custom_fields.trim() !== '') {
-        RTI_STATE.config.customFields = settings.custom_fields.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s !== ''; });
-    }
-
-    // Skip if not empty
-    RTI_STATE.config.skipIfNotEmpty = (settings.skip_if_not_empty === true || settings.skip_if_not_empty === 'Y');
-
-    rtiLog('Config loaded', RTI_STATE.config);
-
-    // Check if new requirement
-    var reqId = spiraAppManager.getDataItemField('RequirementId');
-    RTI_STATE.isNewRequirement = (!reqId || reqId <= 0);
-    rtiLog('Is new requirement: ' + RTI_STATE.isNewRequirement + ' (reqId=' + reqId + ')');
-
-    if (!RTI_STATE.isNewRequirement) {
-        rtiLog('Not a new requirement, done');
-        return;
-    }
-
-    // Get current type and inject
-    var typeId = spiraAppManager.getDataItemField('RequirementTypeId');
-    rtiLog('Initial type ID: ' + typeId);
-    if (typeId) {
-        rtiPerformInjection(parseInt(typeId, 10));
-    }
-
-    // Register for type dropdown changes
-    spiraAppManager.registerEvent_dropdownChanged('RequirementTypeId', function(oldVal, newVal) {
-        rtiLog('Type dropdown changed', { oldVal: oldVal, newVal: newVal });
-        if (RTI_STATE.isNewRequirement && newVal) {
-            setTimeout(function() {
-                var newTypeId = parseInt(newVal, 10);
-                if (newTypeId !== RTI_STATE.lastInjectedTypeId) {
-                    rtiPerformInjection(newTypeId);
-                }
-            }, 10);
-        }
-        return true;
-    });
-}
-
-function rtiPerformInjection(typeId) {
-    rtiLog('Performing injection for type ' + typeId);
-
-    var typeIdStr = String(typeId);
-    var templateConfig = RTI_STATE.config.templates[typeIdStr] || DEFAULT_TEMPLATES[typeIdStr];
-
-    if (!templateConfig || !templateConfig.template) {
-        rtiLog('No template for type ' + typeId);
-        return;
-    }
-
-    var injected = 0;
-
-    // Description field
-    if (rtiInjectField('Description', templateConfig.template)) {
-        injected++;
-    }
-
-    // Custom fields
-    for (var i = 0; i < RTI_STATE.config.customFields.length; i++) {
-        if (rtiInjectField(RTI_STATE.config.customFields[i], templateConfig.template)) {
-            injected++;
-        }
-    }
-
-    if (injected > 0) {
-        rtiLog('Injected ' + injected + ' field(s)');
-        spiraAppManager.displaySuccessMessage('[RTI] Template "' + templateConfig.name + '" injected');
-        RTI_STATE.lastInjectedTypeId = typeId;
+        console.log(prefix, message);
     }
 }
 
-function rtiInjectField(fieldName, html) {
-    try {
-        var currentVal = spiraAppManager.getLiveFormFieldValue(fieldName);
+// ============================================================
+// INITIALISATION
+// ============================================================
+initRTI();
 
-        if (RTI_STATE.config.skipIfNotEmpty && currentVal) {
-            var stripped = String(currentVal).replace(/<[^>]*>/g, '').trim();
-            if (stripped !== '' && stripped !== '&nbsp;') {
-                rtiLog('Skipping non-empty: ' + fieldName);
-                return false;
-            }
-        }
+function initRTI() {
+    log("INFO", "Initializing RTI v" + RTI_VERSION);
 
-        spiraAppManager.updateFormField(fieldName, html);
-        rtiLog('Injected: ' + fieldName);
-        return true;
-    } catch (e) {
-        rtiLog('Error injecting ' + fieldName, e);
+    // Charger les settings de base
+    if (!loadSettings()) {
+        log("WARN", "Settings not available or no templates configured, RTI disabled");
+        return;
+    }
+
+    // Enregistrer event loaded
+    spiraAppManager.registerEvent_loaded(onPageLoaded);
+
+    // Enregistrer event changement de type
+    spiraAppManager.registerEvent_dropdownChanged("RequirementTypeId", onTypeChanged);
+
+    log("INFO", "Event handlers registered");
+}
+
+// ============================================================
+// CHARGEMENT SETTINGS (SLOTS avec dropdown)
+// ============================================================
+function loadSettings() {
+    state.settings = SpiraAppSettings[RTI_GUID];
+
+    if (!state.settings) {
         return false;
     }
+
+    // Mode debug
+    state.debugMode = (state.settings.debug_mode === true ||
+                       state.settings.debug_mode === "Y");
+
+    // Charger les templates depuis les slots (dropdown retourne directement l'ID)
+    state.templates = {};
+
+    for (var i = 1; i <= NUM_SLOTS; i++) {
+        // type_id_X contient directement le RequirementTypeId (depuis dropdown)
+        var typeId = state.settings["type_id_" + i];
+        var template = state.settings["template_" + i];
+
+        // Si le type est selectionne et le template n'est pas vide
+        if (typeId && template && template.trim() !== "") {
+            var typeIdStr = String(typeId);
+            // Premier template pour ce type gagne (si doublon)
+            if (!state.templates[typeIdStr]) {
+                state.templates[typeIdStr] = template;
+                log("DEBUG", "Slot " + i + ": Type ID " + typeIdStr + " configured");
+            } else {
+                log("WARN", "Slot " + i + ": Type ID " + typeIdStr + " already configured, skipping");
+            }
+        }
+    }
+
+    var configuredCount = Object.keys(state.templates).length;
+    log("DEBUG", "Templates configured:", configuredCount);
+    return configuredCount > 0;
 }
 
-// Debug helpers
-window.RTI_showState = function() { console.log(RTI_STATE); return RTI_STATE; };
-window.RTI_showConfig = function() { console.log(RTI_STATE.config); return RTI_STATE.config; };
-window.RTI_forceInject = function(typeId) {
-    if (!typeId) typeId = spiraAppManager.getDataItemField('RequirementTypeId');
-    RTI_STATE.lastInjectedTypeId = null;
-    rtiPerformInjection(parseInt(typeId, 10));
+// ============================================================
+// HANDLER: PAGE LOADED
+// ============================================================
+function onPageLoaded() {
+    log("DEBUG", "Page loaded");
+
+    // Seulement en mode creation
+    if (spiraAppManager.artifactId) {
+        log("DEBUG", "Edit mode (artifactId exists), skipping");
+        return;
+    }
+
+    log("DEBUG", "Creation mode detected");
+    injectTemplateForCurrentType();
+}
+
+// ============================================================
+// HANDLER: TYPE CHANGED
+// ============================================================
+function onTypeChanged(oldVal, newVal) {
+    log("DEBUG", "Type changed", { from: oldVal, to: newVal });
+
+    // Seulement en mode creation
+    if (spiraAppManager.artifactId) {
+        return true;
+    }
+
+    // Verifier si on peut injecter (contenu non modifie)
+    if (canInject()) {
+        // Petit delai pour laisser le dropdown se mettre a jour
+        setTimeout(function() {
+            injectTemplateForCurrentType();
+        }, 10);
+    } else {
+        log("DEBUG", "Content modified by user, skipping injection");
+    }
+
+    return true; // Autoriser le changement de type
+}
+
+// ============================================================
+// INJECTION DU TEMPLATE
+// ============================================================
+function injectTemplateForCurrentType() {
+    // Recuperer le type actuel
+    var typeField = spiraAppManager.getDataItemField("RequirementTypeId", "intValue");
+    var typeId = String(typeField);
+    log("DEBUG", "Current type ID: " + typeId);
+
+    // Recuperer le template depuis la map
+    var template = state.templates[typeId];
+
+    if (!template) {
+        log("INFO", "No template configured for type ID " + typeId);
+        state.lastInjectedTemplate = "";
+        return;
+    }
+
+    // Injecter
+    log("INFO", "Injecting template for type ID " + typeId);
+    spiraAppManager.updateFormField("Description", template);
+    state.lastInjectedTemplate = template;
+
+    // Message de succes
+    spiraAppManager.displaySuccessMessage("[RTI] Template injecte pour le type selectionne");
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function canInject() {
+    var currentValue = spiraAppManager.getDataItemField("Description", "textValue");
+
+    // Peut injecter si champ vide
+    if (!currentValue || currentValue.trim() === "") {
+        return true;
+    }
+
+    // Peut injecter si contenu = dernier template (pas modifie)
+    if (currentValue === state.lastInjectedTemplate) {
+        return true;
+    }
+
+    // Verifier aussi si c'est un des templates configures
+    for (var typeId in state.templates) {
+        if (currentValue === state.templates[typeId]) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// ============================================================
+// DEBUG HELPERS (accessibles depuis console F12)
+// ============================================================
+window.RTI_showState = function() {
+    console.log(RTI_PREFIX + " State:", state);
+    return state;
+};
+
+window.RTI_showTemplates = function() {
+    console.log(RTI_PREFIX + " Templates mapping (typeId -> template):");
+    for (var id in state.templates) {
+        console.log("  Type ID " + id + ": " + state.templates[id].substring(0, 50) + "...");
+    }
+    return state.templates;
+};
+
+window.RTI_injectNow = function() {
+    injectTemplateForCurrentType();
 };

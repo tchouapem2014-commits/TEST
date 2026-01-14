@@ -2,6 +2,8 @@
 # REQUIREMENT TEMPLATE INJECTOR (RTI)
 # SpiraApp Manifest - Version 1.0.0
 # ============================================================
+# Approche: 5 slots avec dropdown natif (settingTypeId: 11)
+# Le dropdown liste automatiquement les types d'exigences du produit
 
 guid: b3f5a8d2-7c41-4e9a-b6d8-1f2e3a4b5c6d
 name: RequirementTemplateInjector
@@ -9,12 +11,13 @@ caption: Requirement Template Injector
 summary: Injects formatted HTML templates into RichText fields when creating requirements
 description: >-
   This SpiraApp automatically injects description templates formatted in HTML
-  when creating new requirements in SpiraPlan. Supports different templates
-  per requirement type and custom RichText fields.
+  when creating new requirements in SpiraPlan. Configure up to 5 requirement
+  types with their own templates using native dropdown selection.
 productSummary: Auto-inject HTML templates into requirement description fields
 productDescription: >-
   This SpiraApp automatically injects description templates formatted in HTML
-  when creating new requirements in SpiraPlan.
+  when creating new requirements in SpiraPlan. Select requirement types from
+  dropdown lists and configure templates using the RichText editor.
 version: 1.0
 author: SpiraApps Developer
 license: MIT
@@ -22,45 +25,106 @@ copyright: Copyright 2025
 url: https://github.com/spiraapps/requirement-template-injector
 
 # ============================================================
-# PRODUCT SETTINGS
+# PRODUCT SETTINGS - 5 SLOTS (Dropdown + Template RichText)
 # ============================================================
-# settingTypeId: 1=Text, 2=RichText, 9=MultilineText, 10=Boolean
+# settingTypeId: 2=RichText, 10=Boolean, 11=ArtifactTypeSingleSelect
+# artifactTypeId: 1=Requirement (filtre le dropdown)
+
 productSettings:
-  - settingTypeId: 10
-    name: enabled
-    caption: Enable injection
+
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 1
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: type_id_1
+    caption: Type d'exigence #1
     position: 1
-    tooltip: Enable or disable automatic template injection
+    artifactTypeId: 1
+    tooltip: Selectionnez le type d'exigence
 
-  - settingTypeId: 9
-    name: templates_config
-    caption: Templates (JSON)
+  - settingTypeId: 2
+    name: template_1
+    caption: Template #1
     position: 2
-    tooltip: JSON format to configure templates per requirement type
+    tooltip: Template HTML pour le type ci-dessus
 
-  - settingTypeId: 1
-    name: custom_fields
-    caption: Custom fields
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 2
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: type_id_2
+    caption: Type d'exigence #2
     position: 3
-    placeholder: Custom_04,Custom_07
-    tooltip: Comma-separated list of custom RichText field names
+    artifactTypeId: 1
+    tooltip: Selectionnez le type d'exigence
 
-  - settingTypeId: 10
-    name: skip_if_not_empty
-    caption: Skip if not empty
+  - settingTypeId: 2
+    name: template_2
+    caption: Template #2
     position: 4
-    tooltip: Do not inject if field already has content
+    tooltip: Template HTML pour le type ci-dessus
 
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 3
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: type_id_3
+    caption: Type d'exigence #3
+    position: 5
+    artifactTypeId: 1
+    tooltip: Selectionnez le type d'exigence
+
+  - settingTypeId: 2
+    name: template_3
+    caption: Template #3
+    position: 6
+    tooltip: Template HTML pour le type ci-dessus
+
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 4
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: type_id_4
+    caption: Type d'exigence #4
+    position: 7
+    artifactTypeId: 1
+    tooltip: Selectionnez le type d'exigence
+
+  - settingTypeId: 2
+    name: template_4
+    caption: Template #4
+    position: 8
+    tooltip: Template HTML pour le type ci-dessus
+
+  # ══════════════════════════════════════════════════════════════
+  # SLOT 5
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 11
+    name: type_id_5
+    caption: Type d'exigence #5
+    position: 9
+    artifactTypeId: 1
+    tooltip: Selectionnez le type d'exigence
+
+  - settingTypeId: 2
+    name: template_5
+    caption: Template #5
+    position: 10
+    tooltip: Template HTML pour le type ci-dessus
+
+  # ══════════════════════════════════════════════════════════════
+  # OPTIONS
+  # ══════════════════════════════════════════════════════════════
   - settingTypeId: 10
     name: debug_mode
-    caption: Debug mode
-    position: 5
-    tooltip: Show debug logs in browser console (F12)
+    caption: Mode debug
+    position: 20
+    tooltip: Affiche les logs dans la console navigateur (F12)
 
 # ============================================================
-# PAGE CONTENTS
+# PAGE CONTENTS - Code injecte sur RequirementDetails
 # ============================================================
 pageContents:
   - pageId: 9
-    name: "injector"
+    name: injector
     code: "file://injector.js"

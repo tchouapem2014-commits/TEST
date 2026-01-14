@@ -491,6 +491,23 @@ spiraAppManager.executeAwsBedrockRuntime(
     successCallback,
     errorCallback
 );
+
+// IMPORTANT: Structure de la reponse executeRest
+// La reponse est WRAPPEE par Spira dans un objet:
+// {
+//   content: "...",      // String JSON de la reponse externe
+//   statusCode: 200,     // Code HTTP
+//   statusDescription: "OK"
+// }
+// Il faut donc parser le content:
+function onRestSuccess(responseWrapper) {
+    if (responseWrapper.statusCode !== 200) {
+        // Erreur HTTP
+        return;
+    }
+    var actualResponse = JSON.parse(responseWrapper.content);
+    // Utiliser actualResponse...
+}
 ```
 
 ### Manipulation des Formulaires
@@ -1686,6 +1703,7 @@ spiraAppManager.registerEvent_dataSaved(function(operation, newId) {
 | 1.1.0 | 2025-01-14 | Ajout registerEvent_dataPreSave, signatures API corrigees, section Bonnes Pratiques |
 | 1.2.0 | 2025-01-14 | Ajout noms de champs par artefact, gridIds, fieldTypes, dataProperties, section storage |
 | 1.3.0 | 2025-01-14 | Signatures completes Storage API, executeApiAsync, createComboDialog, registerEvent_menuEntryClick, parametres evenements |
+| 1.4.0 | 2025-01-14 | Analyse samples: reponse executeRest wrappee, API associations, projectTemplateId, tokens ${} vs {}, window.location.origin |
 
 ---
 
