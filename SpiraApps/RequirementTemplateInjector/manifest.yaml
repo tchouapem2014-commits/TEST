@@ -1,0 +1,66 @@
+# ============================================================
+# REQUIREMENT TEMPLATE INJECTOR (RTI)
+# SpiraApp Manifest - Version 1.0.0
+# ============================================================
+
+guid: b3f5a8d2-7c41-4e9a-b6d8-1f2e3a4b5c6d
+name: RequirementTemplateInjector
+caption: Requirement Template Injector
+summary: Injects formatted HTML templates into RichText fields when creating requirements
+description: >-
+  This SpiraApp automatically injects description templates formatted in HTML
+  when creating new requirements in SpiraPlan. Supports different templates
+  per requirement type and custom RichText fields.
+productSummary: Auto-inject HTML templates into requirement description fields
+productDescription: >-
+  This SpiraApp automatically injects description templates formatted in HTML
+  when creating new requirements in SpiraPlan.
+version: 1.0
+author: SpiraApps Developer
+license: MIT
+copyright: Copyright 2025
+url: https://github.com/spiraapps/requirement-template-injector
+
+# ============================================================
+# PRODUCT SETTINGS
+# ============================================================
+# settingTypeId: 1=Text, 2=RichText, 9=MultilineText, 10=Boolean
+productSettings:
+  - settingTypeId: 10
+    name: enabled
+    caption: Enable injection
+    position: 1
+    tooltip: Enable or disable automatic template injection
+
+  - settingTypeId: 9
+    name: templates_config
+    caption: Templates (JSON)
+    position: 2
+    tooltip: JSON format to configure templates per requirement type
+
+  - settingTypeId: 1
+    name: custom_fields
+    caption: Custom fields
+    position: 3
+    placeholder: Custom_04,Custom_07
+    tooltip: Comma-separated list of custom RichText field names
+
+  - settingTypeId: 10
+    name: skip_if_not_empty
+    caption: Skip if not empty
+    position: 4
+    tooltip: Do not inject if field already has content
+
+  - settingTypeId: 10
+    name: debug_mode
+    caption: Debug mode
+    position: 5
+    tooltip: Show debug logs in browser console (F12)
+
+# ============================================================
+# PAGE CONTENTS
+# ============================================================
+pageContents:
+  - pageId: 9
+    name: "injector"
+    code: "file://injector.js"
