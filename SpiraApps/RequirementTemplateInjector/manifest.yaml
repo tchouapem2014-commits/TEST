@@ -127,4 +127,4 @@ productSettings:
 pageContents:
   - pageId: 9
     name: injector
-    code: "file://code/injector.js"
+    code: "file://injector.js"
