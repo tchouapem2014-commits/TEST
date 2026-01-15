@@ -727,35 +727,99 @@
 
     /**
      * Recupere la liste des taches du projet
-     * Utilise la pagination pour eviter les timeouts
+     * L'API Spira n'a pas d'endpoint GET simple pour lister toutes les taches.
+     * On utilise d'abord /tasks/count puis on recupere chaque tache par ID.
+     * Pour optimiser, on essaie de charger par lots de IDs connus.
      */
     function getProjectTasks(callback) {
-        // L'API Spira requiert des parametres de pagination
-        // Note: starting_row est 0-based, number_of_rows = max resultats
-        var url = "projects/" + stState.currentProjectId + "/tasks?starting_row=0&number_of_rows=500";
+        log("DEBUG", "Fetching project tasks using count + iteration method");
 
-        log("DEBUG", "Fetching tasks from:", url);
+        // Etape 1: Obtenir le nombre de taches
+        var countUrl = "projects/" + stState.currentProjectId + "/tasks/count";
 
         spiraAppManager.executeApi(
             "SmartTasks",
             "7.0",
             "GET",
-            url,
+            countUrl,
             null,
-            function(response) {
-                log("DEBUG", "Tasks received:", response ? response.length : 0);
-                if (response && Array.isArray(response)) {
-                    response.forEach(function(task) {
-                        stState.taskCache[task.TaskId] = task;
-                    });
-                    callback(response);
-                } else {
-                    log("WARN", "Unexpected response format", response);
+            function(countResponse) {
+                var taskCount = parseInt(countResponse) || 0;
+                log("DEBUG", "Task count:", taskCount);
+
+                if (taskCount === 0) {
                     callback([]);
+                    return;
                 }
+
+                // Etape 2: Recuperer les taches par iteration sur les IDs
+                // On essaie les IDs de 1 a taskCount*2 (car les IDs peuvent avoir des trous)
+                var tasks = [];
+                var processed = 0;
+                var maxId = taskCount * 3; // Marge pour les IDs manquants
+                var pendingRequests = 0;
+                var targetTasks = Math.min(taskCount, 200); // Limiter a 200 taches max
+
+                function checkComplete() {
+                    if (tasks.length >= targetTasks || processed >= maxId) {
+                        log("DEBUG", "Tasks loaded:", tasks.length);
+                        tasks.forEach(function(task) {
+                            stState.taskCache[task.TaskId] = task;
+                        });
+                        callback(tasks);
+                    }
+                }
+
+                // Charger les taches par lots de 10 requetes simultanees
+                function loadBatch(startId) {
+                    var batchSize = 10;
+                    for (var i = 0; i < batchSize && startId + i <= maxId; i++) {
+                        var taskId = startId + i;
+                        pendingRequests++;
+
+                        (function(id) {
+                            var url = "projects/" + stState.currentProjectId + "/tasks/" + id;
+                            spiraAppManager.executeApi(
+                                "SmartTasks",
+                                "7.0",
+                                "GET",
+                                url,
+                                null,
+                                function(task) {
+                                    pendingRequests--;
+                                    processed++;
+                                    if (task && task.TaskId) {
+                                        tasks.push(task);
+                                    }
+                                    if (pendingRequests === 0) {
+                                        if (tasks.length < targetTasks && processed < maxId) {
+                                            loadBatch(startId + batchSize);
+                                        } else {
+                                            checkComplete();
+                                        }
+                                    }
+                                },
+                                function(error) {
+                                    pendingRequests--;
+                                    processed++;
+                                    // Tache non trouvee - normal, on continue
+                                    if (pendingRequests === 0) {
+                                        if (tasks.length < targetTasks && processed < maxId) {
+                                            loadBatch(startId + batchSize);
+                                        } else {
+                                            checkComplete();
+                                        }
+                                    }
+                                }
+                            );
+                        })(taskId);
+                    }
+                }
+
+                loadBatch(1);
             },
             function(error) {
-                log("ERROR", "Failed to get project tasks", error);
+                log("ERROR", "Failed to get task count", error);
                 callback([]);
             }
         );
@@ -1435,36 +1499,50 @@
 
     /**
      * Applique les modifications de dates
+     * Note: L'API PUT /tasks requiert l'objet tache complet
      */
     function applyDateChanges(changes, overlay) {
         var completed = 0;
         var errors = [];
 
-        changes.forEach(function(change, index) {
-            var taskData = {
-                TaskId: change.taskId,
-                StartDate: formatDateISO(change.newStartDate),
-                EndDate: formatDateISO(change.newEndDate)
-            };
-
-            updateTask(change.taskId, taskData, function(success, error) {
-                completed++;
-
-                if (!success) {
-                    errors.push('TK-' + change.taskId + ': ' + error);
+        changes.forEach(function(change) {
+            // Recuperer d'abord la tache complete depuis le cache ou l'API
+            getTaskDetails(change.taskId, function(fullTask) {
+                if (!fullTask) {
+                    completed++;
+                    errors.push('TK-' + change.taskId + ': Tache non trouvee');
+                    checkComplete();
+                    return;
                 }
 
-                if (completed === changes.length) {
-                    closeDialog(overlay);
+                // Modifier uniquement les dates dans l'objet complet
+                fullTask.StartDate = formatDateISO(change.newStartDate);
+                fullTask.EndDate = formatDateISO(change.newEndDate);
 
-                    if (errors.length === 0) {
-                        showNotification('Toutes les dates ont ete mises a jour!', 'success');
-                    } else {
-                        showNotification('Certaines mises a jour ont echoue: ' + errors.join(', '), 'warning');
+                // Envoyer l'objet complet pour la mise a jour
+                updateTask(change.taskId, fullTask, function(success, err) {
+                    completed++;
+
+                    if (!success) {
+                        errors.push('TK-' + change.taskId + ': ' + err);
                     }
-                }
+
+                    checkComplete();
+                });
             });
         });
+
+        function checkComplete() {
+            if (completed === changes.length) {
+                closeDialog(overlay);
+
+                if (errors.length === 0) {
+                    showNotification('Toutes les dates ont ete mises a jour!', 'success');
+                } else {
+                    showNotification('Certaines mises a jour ont echoue: ' + errors.join(', '), 'warning');
+                }
+            }
+        }
     }
 
     /**
