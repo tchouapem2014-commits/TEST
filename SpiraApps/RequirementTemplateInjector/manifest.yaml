@@ -1,9 +1,10 @@
 # ============================================================
 # REQUIREMENT TEMPLATE INJECTOR (RTI)
-# SpiraApp Manifest - Version 1.0.0
+# SpiraApp Manifest - Version 1.1.0
 # ============================================================
 # Approche: 5 slots avec dropdown natif (settingTypeId: 11)
 # Le dropdown liste automatiquement les types d'exigences du produit
+# v1.1.0: Ajout du bouton "Injecter Template" dans la toolbar
 
 guid: b3f5a8d2-7c41-4e9a-b6d8-1f2e3a4b5c6d
 name: RequirementTemplateInjector
@@ -13,12 +14,14 @@ description: >-
   This SpiraApp automatically injects description templates formatted in HTML
   when creating new requirements in SpiraPlan. Configure up to 5 requirement
   types with their own templates using native dropdown selection.
+  Includes a toolbar button for manual template injection.
 productSummary: Auto-inject HTML templates into requirement description fields
 productDescription: >-
   This SpiraApp automatically injects description templates formatted in HTML
   when creating new requirements in SpiraPlan. Select requirement types from
   dropdown lists and configure templates using the RichText editor.
-version: 1.0
+  A toolbar button allows manual injection when the description field is empty.
+version: 1.1
 author: SpiraApps Developer
 license: MIT
 copyright: Copyright 2025
@@ -128,3 +131,20 @@ pageContents:
   - pageId: 9
     name: injector
     code: "file://injector.js"
+
+# ============================================================
+# MENUS - Bouton dans la toolbar RequirementDetails
+# ============================================================
+menus:
+  - pageId: 9
+    caption: RTI
+    icon: fa-solid fa-file-import
+    isActive: true
+    entries:
+      - name: injectTemplate
+        caption: Injecter Template
+        tooltip: Injecte le template dans le champ Description (si vide)
+        icon: fa-solid fa-paste
+        isActive: true
+        actionTypeId: 2
+        action: injectTemplate

@@ -29,12 +29,38 @@ Parametres configurables au niveau produit (Product Settings) :
 - Activation/desactivation par type
 
 #### 2.4 Comportement Utilisateur
-1. L'utilisateur clique sur "Nouveau" pour creer une exigence
-2. Il remplit les champs souhaites et/ou selectionne un type d'exigence (un type par defaut est toujours pre-selectionne)
-3. **A la premiere sauvegarde** : le template correspondant au type choisi est automatiquement injecte dans le champ RichText cible
-4. L'utilisateur peut ensuite modifier le contenu comme il le souhaite
 
-> **Note** : L'injection se fait a la sauvegarde et non au changement de type, car un type par defaut est toujours present. Cela garantit que le template est toujours applique.
+L'injection se declenche automatiquement dans deux cas :
+
+1. **Au chargement de la page** (avec un delai de 500ms) :
+   - L'utilisateur ouvre une exigence (nouvelle ou existante)
+   - Si le champ Description est vide, le template correspondant au type actuel est injecte
+
+2. **Au changement de type d'exigence** :
+   - L'utilisateur modifie le type dans le dropdown RequirementTypeId
+   - Si le champ Description est vide, le template du nouveau type est injecte
+
+**Protection du contenu existant** : Si le champ Description contient deja du texte, aucune injection n'est effectuee. Le contenu de l'utilisateur est toujours preserve.
+
+> **Note** : Spira cree immediatement un artefact avec un ID quand on clique sur "New". Il n'y a donc pas de distinction entre mode creation et mode edition. L'injection se base uniquement sur le contenu du champ Description.
+
+#### 2.5 Bouton d'Injection Manuelle (v1.1)
+
+Un bouton "Injecter Template" est disponible sur la page de detail d'une exigence pour permettre l'injection manuelle du template.
+
+**Comportement :**
+
+1. Le bouton apparait dans la barre d'outils de la page RequirementDetails
+2. Au clic :
+   - **Si le champ Description est vide** : le template correspondant au type actuel est injecte
+   - **Si le champ Description contient du texte** : un message d'avertissement informe l'utilisateur que le champ n'est pas vide
+3. Fonctionne en mode creation ET en mode edition (pour recharger un template si besoin)
+
+**Cas d'usage :**
+
+- L'utilisateur a efface le contenu et veut recharger le template
+- L'utilisateur veut forcer l'injection sur une exigence existante
+- Debug et test de la configuration des templates
 
 ---
 
@@ -92,32 +118,40 @@ pageContents:
 ### 4. Logique du Code
 
 ```javascript
-// Pseudo-code de la logique principale
+// Pseudo-code de la logique principale v1.5.0
 
-// 1. Ecouter l'evenement dataPreSave (avant soumission a la BDD)
-// 2. Detecter si c'est une nouvelle exigence (pas d'ID existant)
-// 3. Recuperer le type d'exigence selectionne
-// 4. Charger la configuration des templates
-// 5. Si un template existe pour ce type, l'injecter dans le champ cible
+// 1. Ecouter l'evenement loaded (page chargee)
+// 2. Ecouter l'evenement dropdownChanged sur RequirementTypeId
+// 3. Pour chaque evenement: verifier si Description est vide
+// 4. Si vide, injecter le template correspondant au type actuel
 
-spiraAppManager.registerEvent_dataPreSave(function(operation, newId) {
-    // Verifier si c'est une creation (operation == "Insert" ou pas d'artifactId)
-    if (!spiraAppManager.artifactId) {
-        // Recuperer le type selectionne via le formulaire
-        const typeId = spiraAppManager.getDataItemField("RequirementTypeId", "intValue");
-
-        // Charger le template correspondant
-        const template = getTemplateForType(typeId);
-
-        // Injecter dans le champ cible si template existe et champ vide
-        if (template) {
-            const currentValue = spiraAppManager.getDataItemField("Description", "textValue");
-            if (!currentValue || currentValue.trim() === "") {
-                spiraAppManager.updateFormField("Description", template);
-            }
+// Handler pour le chargement de la page
+spiraAppManager.registerEvent_loaded(function() {
+    setTimeout(function() {
+        var currentValue = spiraAppManager.getDataItemField("Description", "textValue");
+        if (!currentValue || currentValue.trim() === "") {
+            injectTemplateForCurrentType();
         }
+    }, 500);
+});
+
+// Handler pour le changement de type
+spiraAppManager.registerEvent_dropdownChanged("RequirementTypeId", function(oldValue, newValue) {
+    var currentValue = spiraAppManager.getDataItemField("Description", "textValue");
+    if (!currentValue || currentValue.trim() === "") {
+        injectTemplateForType(String(newValue));
     }
 });
+
+// Injection du template
+function injectTemplateForType(typeId) {
+    var template = state.templates[typeId];
+    if (template) {
+        // IMPORTANT: utiliser la signature a 3 parametres pour RichText
+        spiraAppManager.updateFormField("Description", "textValue", template);
+        spiraAppManager.displaySuccessMessage("[RTI] Template injecte");
+    }
+}
 ```
 
 ---
@@ -182,11 +216,12 @@ spiraAppManager.registerEvent_dataPreSave(function(operation, newId) {
 
 ### 6. Points d'Attention
 
-1. **Detection du mode creation** : Verifier si l'artefact n'a pas encore d'ID (RequirementId == null ou undefined)
-2. **Champs Custom** : Tester l'acces aux champs personnalises RichText
-3. **Ecrasement** : Ne pas ecraser si l'utilisateur a deja saisi du contenu dans le champ cible
-4. **Performance** : Charger les templates une seule fois au demarrage
-5. **Type par defaut** : L'injection fonctionne meme si l'utilisateur ne change pas le type (le type par defaut est utilise)
+1. **Pas de mode creation distinct** : Spira cree immediatement un artefact avec un ID quand on clique sur "New". Ne pas se baser sur `artifactId` pour detecter le mode creation.
+2. **Signature updateFormField** : Utiliser la signature a 3 parametres `updateFormField(fieldName, "textValue", value)` pour les champs RichText.
+3. **Ecrasement** : Ne jamais ecraser si l'utilisateur a deja saisi du contenu dans le champ cible.
+4. **Performance** : Charger les templates une seule fois au demarrage depuis `SpiraAppSettings`.
+5. **Delai au chargement** : Utiliser un `setTimeout` de 500ms apres `registerEvent_loaded` pour laisser le formulaire se charger completement.
+6. **SpiraAppSettings** : Verifier que `SpiraAppSettings` est disponible avant d'initialiser (peut necessiter un delai).
 
 ---
 
@@ -215,3 +250,4 @@ RequirementTemplateInjector/
 ---
 
 *Document cree le 2025-01-08*
+*Mis a jour le 2026-01-14 - v1.5.0*
