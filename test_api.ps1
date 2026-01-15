@@ -122,3 +122,72 @@ try {
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
 }
+
+Write-Host ""
+Write-Host "=== Test 8: GET associations pour Task 1 (ArtifactTypeId=6) ===" -ForegroundColor Cyan
+try {
+    # ArtifactTypeId 6 = Task
+    $response = Invoke-RestMethod -Uri "$baseUrl/projects/1/associations/6/1" -Method GET -Headers $headers
+    Write-Host "SUCCESS: $($response.Count) associations trouvees" -ForegroundColor Green
+    if ($response.Count -gt 0) {
+        $response | ForEach-Object {
+            Write-Host "  LinkId=$($_.ArtifactLinkId) Type=$($_.ArtifactLinkTypeId) -> $($_.DestArtifactTypeName) $($_.DestArtifactId)"
+        }
+    }
+} catch {
+    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+Write-Host ""
+Write-Host "=== Test 9: POST creer association Task1 -> Task2 ===" -ForegroundColor Cyan
+try {
+    $association = @{
+        SourceArtifactId = 1
+        SourceArtifactTypeId = 6  # Task
+        DestArtifactId = 2
+        DestArtifactTypeId = 6   # Task
+        ArtifactLinkTypeId = 2   # Depends-on
+        Comment = "SmartTasks|FS|0"  # Type FS, Lag 0
+    }
+    $body = $association | ConvertTo-Json
+    Write-Host "Body: $body"
+    $response = Invoke-RestMethod -Uri "$baseUrl/projects/1/associations" -Method POST -Headers $headers -Body $body
+    Write-Host "SUCCESS: Association creee, LinkId=$($response.ArtifactLinkId)" -ForegroundColor Green
+} catch {
+    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+Write-Host ""
+Write-Host "=== Test 10: PUT task avec objet GET complet re-envoye ===" -ForegroundColor Cyan
+try {
+    # Recuperer la tache complete (Task 1 qui a des dates)
+    $task = Invoke-RestMethod -Uri "$baseUrl/projects/1/tasks/1" -Method GET -Headers $headers
+    Write-Host "Task originale: Name=$($task.Name), StartDate=$($task.StartDate)"
+
+    # Modifier uniquement EndDate
+    $newEndDate = (Get-Date $task.EndDate).AddDays(1).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+    $task.EndDate = $newEndDate
+
+    $body = $task | ConvertTo-Json -Depth 10
+    Write-Host "Envoi de l'objet complet modifie..."
+    $response = Invoke-RestMethod -Uri "$baseUrl/projects/1/tasks" -Method PUT -Headers $headers -Body $body
+    Write-Host "SUCCESS: Task mise a jour" -ForegroundColor Green
+} catch {
+    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    if ($_.Exception.Response) {
+        try {
+            $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+            Write-Host "Details: $($reader.ReadToEnd())"
+        } catch {}
+    }
+}
+
+Write-Host ""
+Write-Host "=== Test 11: Afficher structure complete d'une task ===" -ForegroundColor Cyan
+try {
+    $task = Invoke-RestMethod -Uri "$baseUrl/projects/1/tasks/1" -Method GET -Headers $headers
+    Write-Host "Structure complete de Task 1:" -ForegroundColor Green
+    $task | ConvertTo-Json -Depth 10
+} catch {
+    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+}

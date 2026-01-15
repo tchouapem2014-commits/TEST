@@ -2,15 +2,15 @@
  * SMARTTASKS (ST)
  * Version 1.0.0
  *
- * Gestion intelligente des dependances de taches avec calcul
- * automatique des dates - Inspire de Helix Plan
+ * Gestion intelligente des dépendances de tâches avec calcul
+ * automatique des dates - Inspiré de Helix Plan
  *
- * Fonctionnalites:
- * - 4 types de dependances (FS, SS, FF, SF)
+ * Fonctionnalités:
+ * - 4 types de dépendances (FS, SS, FF, SF)
  * - Calcul automatique des dates avec lag/lead time
  * - Propagation en cascade
- * - Detection des cycles
- * - Visualisation des chaines de dependances
+ * - Détection des cycles
+ * - Visualisation des chaînes de dépendances
  *
  * @author SmartTasks Team
  * @version 1.0.0
@@ -25,15 +25,16 @@
     var ST_VERSION = "1.0.0";
     var ST_PREFIX = "[ST]";
     var ST_GUID = "c7e9f3a1-5b28-4d6c-9e1f-8a2b3c4d5e6f";
-    var CUSTOM_PROPERTY_NAME = "SmartTasksLinks";
     var ARTIFACT_TYPE_TASK = 6;
+    var ARTIFACT_LINK_TYPE_DEPENDS = 2;  // "Depends-on" link type in SpiraPlan
+    var SMARTTASKS_COMMENT_PREFIX = "SmartTasks|";  // Prefix pour identifier nos associations
 
-    // Types de dependances
+    // Types de dépendances
     var DEPENDENCY_TYPES = {
-        FS: { code: 'FS', name: 'Finish-to-Start', description: 'Le successeur commence apres la fin du predecesseur' },
-        SS: { code: 'SS', name: 'Start-to-Start', description: 'Le successeur commence apres le debut du predecesseur' },
-        FF: { code: 'FF', name: 'Finish-to-Finish', description: 'Le successeur finit apres la fin du predecesseur' },
-        SF: { code: 'SF', name: 'Start-to-Finish', description: 'Le successeur finit apres le debut du predecesseur' }
+        FS: { code: 'FS', name: 'Finish-to-Start', description: 'Le successeur commence après la fin du prédécesseur' },
+        SS: { code: 'SS', name: 'Start-to-Start', description: 'Le successeur commence après le début du prédécesseur' },
+        FF: { code: 'FF', name: 'Finish-to-Finish', description: 'Le successeur finit après la fin du prédécesseur' },
+        SF: { code: 'SF', name: 'Start-to-Finish', description: 'Le successeur finit après le début du prédécesseur' }
     };
 
     // ============================================================
@@ -72,7 +73,7 @@
     // ============================================================
 
     /**
-     * Clone une date pour eviter les mutations
+     * Clone une date pour éviter les mutations
      */
     function cloneDate(date) {
         if (!date) return null;
@@ -83,7 +84,7 @@
     }
 
     /**
-     * Ajoute des jours ouvrables a une date (excluant samedi et dimanche si skipWeekends)
+     * Ajoute des jours ouvrables à une date (excluant samedi et dimanche si skipWeekends)
      */
     function addWorkingDays(date, days) {
         var result = cloneDate(date);
@@ -160,7 +161,7 @@
     // ============================================================
 
     /**
-     * Calcule les dates du successeur selon le type de dependance
+     * Calcule les dates du successeur selon le type de dépendance
      */
     function calculateSuccessorDates(predecessorStart, predecessorEnd, linkType, lagDays, successorDuration) {
         var result = {
@@ -212,7 +213,7 @@
     }
 
     /**
-     * Construit un graphe de dependances
+     * Construit un graphe de dépendances
      */
     function buildDependencyGraph(tasks, dependencies) {
         var predecessors = {};
@@ -252,7 +253,7 @@
     }
 
     /**
-     * Tri topologique des taches
+     * Tri topologique des tâches
      */
     function topologicalSort(tasks, graph) {
         var sorted = [];
@@ -261,7 +262,7 @@
 
         function visit(taskId) {
             if (inStack[taskId]) {
-                throw new Error('Dependance circulaire detectee impliquant la tache: ' + taskId);
+                throw new Error('Dépendance circulaire détectée impliquant la tâche: ' + taskId);
             }
 
             if (visited[taskId]) {
@@ -291,7 +292,7 @@
     }
 
     /**
-     * Detecte les dependances circulaires
+     * Détecte les dépendances circulaires
      */
     function detectCircularDependencies(tasks, dependencies) {
         var graph = buildDependencyGraph(tasks, dependencies);
@@ -343,7 +344,7 @@
     }
 
     /**
-     * Propage les changements dans la chaine de dependances
+     * Propage les changements dans la chaîne de dépendances
      */
     function propagateChanges(tasks, dependencies) {
         var taskMap = {};
@@ -441,7 +442,7 @@
     }
 
     /**
-     * Valide une dependance avant de l'ajouter
+     * Valide une dépendance avant de l'ajouter
      */
     function validateDependency(tasks, existingDependencies, newDependency) {
         var errors = [];
@@ -458,20 +459,20 @@
         });
 
         if (!taskMap[predId]) {
-            errors.push('La tache predecesseur "TK-' + predId + '" n\'existe pas');
+            errors.push('La tâche prédécesseur "TK-' + predId + '" n\'existe pas');
         }
 
         if (!taskMap[succId]) {
-            errors.push('La tache successeur "TK-' + succId + '" n\'existe pas');
+            errors.push('La tâche successeur "TK-' + succId + '" n\'existe pas');
         }
 
         if (predId === succId) {
-            errors.push('Une tache ne peut pas dependre d\'elle-meme');
+            errors.push('Une tâche ne peut pas dépendre d\'elle-même');
         }
 
         var validTypes = ['FS', 'SS', 'FF', 'SF'];
         if (validTypes.indexOf(linkType) === -1) {
-            errors.push('Type de dependance invalide: ' + linkType);
+            errors.push('Type de dépendance invalide: ' + linkType);
         }
 
         var exists = existingDependencies.some(function(dep) {
@@ -479,7 +480,7 @@
         });
 
         if (exists) {
-            warnings.push('Une dependance entre ces deux taches existe deja');
+            warnings.push('Une dépendance entre ces deux tâches existe déjà');
         }
 
         if (errors.length === 0) {
@@ -488,7 +489,7 @@
 
             var circularCheck = detectCircularDependencies(tasks, testDependencies);
             if (circularCheck.hasCircular) {
-                errors.push('Cette dependance creerait un cycle: ' + circularCheck.cycles[0].description);
+                errors.push('Cette dépendance créerait un cycle: ' + circularCheck.cycles[0].description);
             }
         }
 
@@ -605,92 +606,219 @@
     }
 
     // ============================================================
-    // STOCKAGE DES DEPENDANCES (Custom Property)
+    // STOCKAGE DES DÉPENDANCES (API Associations SpiraPlan)
     // ============================================================
+    // Les dépendances sont stockées comme Associations natives SpiraPlan
+    // avec le Comment au format: "SmartTasks|{type}|{lag}"
+    // Ex: "SmartTasks|FS|0" = Finish-to-Start avec lag 0
 
     /**
-     * Charge les dependances depuis le Custom Property
+     * Parse le commentaire d'une association pour extraire les infos SmartTasks
+     * @returns {object|null} {type, lag} ou null si pas une association SmartTasks
      */
-    function loadDependenciesFromCustomProperty() {
-        try {
-            var customProps = spiraAppManager.getDataItemField("CustomProperties", "value");
-            if (!customProps) {
-                stState.dependencies = [];
-                return;
-            }
-
-            // Chercher le custom property SmartTasksLinks
-            for (var i = 0; i < customProps.length; i++) {
-                if (customProps[i].Definition && customProps[i].Definition.Name === CUSTOM_PROPERTY_NAME) {
-                    var value = customProps[i].StringValue;
-                    if (value) {
-                        try {
-                            var data = JSON.parse(value);
-                            stState.dependencies = data.links || [];
-                            log("DEBUG", "Dependencies loaded:", stState.dependencies.length);
-                        } catch (e) {
-                            log("ERROR", "Failed to parse dependencies JSON", e);
-                            stState.dependencies = [];
-                        }
-                    }
-                    return;
-                }
-            }
-
-            stState.dependencies = [];
-        } catch (e) {
-            log("ERROR", "Failed to load dependencies", e);
-            stState.dependencies = [];
+    function parseAssociationComment(comment) {
+        if (!comment || !comment.startsWith(SMARTTASKS_COMMENT_PREFIX)) {
+            return null;
         }
+        var parts = comment.split('|');
+        if (parts.length >= 3) {
+            return {
+                type: parts[1] || 'FS',
+                lag: parseInt(parts[2]) || 0
+            };
+        }
+        return { type: 'FS', lag: 0 };
     }
 
     /**
-     * Sauvegarde les dependances dans le Custom Property
+     * Formate les infos de dépendance en commentaire pour l'association
+     */
+    function formatAssociationComment(type, lag) {
+        return SMARTTASKS_COMMENT_PREFIX + (type || 'FS') + '|' + (lag || 0);
+    }
+
+    /**
+     * Charge les dépendances depuis l'API Associations SpiraPlan
+     * pour la tâche courante
+     */
+    function loadDependenciesFromCustomProperty() {
+        if (!stState.currentTaskId) {
+            stState.dependencies = [];
+            return;
+        }
+
+        var url = "projects/" + stState.currentProjectId + "/associations/" +
+                  ARTIFACT_TYPE_TASK + "/" + stState.currentTaskId;
+
+        spiraAppManager.executeApi(
+            "SmartTasks",
+            "7.0",
+            "GET",
+            url,
+            null,
+            function(associations) {
+                stState.dependencies = [];
+
+                if (associations && Array.isArray(associations)) {
+                    associations.forEach(function(assoc) {
+                        // Filtrer uniquement les associations SmartTasks (par le commentaire)
+                        var parsed = parseAssociationComment(assoc.Comment);
+                        if (parsed && assoc.DestArtifactTypeId === ARTIFACT_TYPE_TASK) {
+                            stState.dependencies.push({
+                                linkId: assoc.ArtifactLinkId,
+                                predecessorId: assoc.DestArtifactId,
+                                successorId: stState.currentTaskId,
+                                type: parsed.type,
+                                lag: parsed.lag
+                            });
+                        }
+                    });
+                }
+
+                log("DEBUG", "Dependencies loaded from API:", stState.dependencies.length);
+            },
+            function(error) {
+                log("ERROR", "Failed to load dependencies from API", error);
+                stState.dependencies = [];
+            }
+        );
+    }
+
+    /**
+     * Charge toutes les dépendances du projet (pour le recalcul global)
+     */
+    function loadAllProjectDependencies(callback) {
+        // Charger les taches d'abord, puis leurs associations
+        getProjectTasks(function(tasks) {
+            var allDependencies = [];
+            var pending = tasks.length;
+
+            if (pending === 0) {
+                callback(allDependencies);
+                return;
+            }
+
+            tasks.forEach(function(task) {
+                var url = "projects/" + stState.currentProjectId + "/associations/" +
+                          ARTIFACT_TYPE_TASK + "/" + task.TaskId;
+
+                spiraAppManager.executeApi(
+                    "SmartTasks",
+                    "7.0",
+                    "GET",
+                    url,
+                    null,
+                    function(associations) {
+                        if (associations && Array.isArray(associations)) {
+                            associations.forEach(function(assoc) {
+                                var parsed = parseAssociationComment(assoc.Comment);
+                                if (parsed && assoc.DestArtifactTypeId === ARTIFACT_TYPE_TASK) {
+                                    allDependencies.push({
+                                        linkId: assoc.ArtifactLinkId,
+                                        predecessorId: assoc.DestArtifactId,
+                                        successorId: task.TaskId,
+                                        type: parsed.type,
+                                        lag: parsed.lag
+                                    });
+                                }
+                            });
+                        }
+                        pending--;
+                        if (pending === 0) {
+                            log("DEBUG", "All project dependencies loaded:", allDependencies.length);
+                            callback(allDependencies);
+                        }
+                    },
+                    function(error) {
+                        pending--;
+                        if (pending === 0) {
+                            callback(allDependencies);
+                        }
+                    }
+                );
+            });
+        });
+    }
+
+    /**
+     * Sauvegarde une nouvelle dépendance via l'API Associations
      */
     function saveDependenciesToCustomProperty(dependencies, callback) {
-        var data = {
-            version: ST_VERSION,
-            links: dependencies,
-            lastModified: new Date().toISOString()
+        // Cette fonction est appelée après ajout d'une dépendance
+        // La sauvegarde est déjà faite via createAssociation
+        stState.dependencies = dependencies;
+        if (callback) callback(true);
+    }
+
+    /**
+     * Crée une association (dépendance) entre deux tâches
+     */
+    function createAssociation(successorId, predecessorId, type, lag, callback) {
+        var association = {
+            SourceArtifactId: successorId,
+            SourceArtifactTypeId: ARTIFACT_TYPE_TASK,
+            DestArtifactId: predecessorId,
+            DestArtifactTypeId: ARTIFACT_TYPE_TASK,
+            ArtifactLinkTypeId: ARTIFACT_LINK_TYPE_DEPENDS,
+            Comment: formatAssociationComment(type, lag)
         };
 
-        var jsonString = JSON.stringify(data);
+        var url = "projects/" + stState.currentProjectId + "/associations";
 
-        try {
-            // Chercher l'index du custom property SmartTasksLinks
-            var customProps = spiraAppManager.getDataItemField("CustomProperties", "value");
-            if (!customProps) {
-                log("ERROR", "Custom Properties not available");
-                if (callback) callback(false, "Custom Properties not available");
-                return;
+        spiraAppManager.executeApi(
+            "SmartTasks",
+            "7.0",
+            "POST",
+            url,
+            JSON.stringify(association),
+            function(response) {
+                log("DEBUG", "Association created, LinkId:", response.ArtifactLinkId);
+
+                // Ajouter à l'état local
+                stState.dependencies.push({
+                    linkId: response.ArtifactLinkId,
+                    predecessorId: predecessorId,
+                    successorId: successorId,
+                    type: type,
+                    lag: lag
+                });
+
+                if (callback) callback(true, response);
+            },
+            function(error) {
+                log("ERROR", "Failed to create association", error);
+                if (callback) callback(false, error);
             }
+        );
+    }
 
-            var propIndex = -1;
-            for (var i = 0; i < customProps.length; i++) {
-                if (customProps[i].Definition && customProps[i].Definition.Name === CUSTOM_PROPERTY_NAME) {
-                    propIndex = i;
-                    break;
-                }
+    /**
+     * Supprime une association (dépendance)
+     */
+    function deleteAssociation(linkId, callback) {
+        var url = "projects/" + stState.currentProjectId + "/associations/" + linkId;
+
+        spiraAppManager.executeApi(
+            "SmartTasks",
+            "7.0",
+            "DELETE",
+            url,
+            null,
+            function(response) {
+                log("DEBUG", "Association deleted, LinkId:", linkId);
+
+                // Retirer de l'état local
+                stState.dependencies = stState.dependencies.filter(function(dep) {
+                    return dep.linkId !== linkId;
+                });
+
+                if (callback) callback(true);
+            },
+            function(error) {
+                log("ERROR", "Failed to delete association", error);
+                if (callback) callback(false, error);
             }
-
-            if (propIndex === -1) {
-                log("ERROR", "Custom Property '" + CUSTOM_PROPERTY_NAME + "' not found");
-                if (callback) callback(false, "Custom Property not found. Please create a Text custom property named '" + CUSTOM_PROPERTY_NAME + "'");
-                return;
-            }
-
-            customProps[propIndex].StringValue = jsonString;
-
-            spiraAppManager.updateFormField("CustomProperties", "value", customProps);
-
-            stState.dependencies = dependencies;
-            log("DEBUG", "Dependencies saved:", dependencies.length);
-
-            if (callback) callback(true);
-        } catch (e) {
-            log("ERROR", "Failed to save dependencies", e);
-            if (callback) callback(false, e.message);
-        }
+        );
     }
 
     // ============================================================
@@ -698,7 +826,7 @@
     // ============================================================
 
     /**
-     * Recupere les details d'une tache
+     * Récupère les détails d'une tâche
      */
     function getTaskDetails(taskId, callback) {
         if (stState.taskCache[taskId]) {
@@ -726,15 +854,15 @@
     }
 
     /**
-     * Recupere la liste des taches du projet
-     * L'API Spira n'a pas d'endpoint GET simple pour lister toutes les taches.
-     * On utilise d'abord /tasks/count puis on recupere chaque tache par ID.
+     * Récupère la liste des tâches du projet
+     * L'API Spira n'a pas d'endpoint GET simple pour lister toutes les tâches.
+     * On utilise d'abord /tasks/count puis on récupère chaque tâche par ID.
      * Pour optimiser, on essaie de charger par lots de IDs connus.
      */
     function getProjectTasks(callback) {
         log("DEBUG", "Fetching project tasks using count + iteration method");
 
-        // Etape 1: Obtenir le nombre de taches
+        // Étape 1: Obtenir le nombre de tâches
         var countUrl = "projects/" + stState.currentProjectId + "/tasks/count";
 
         spiraAppManager.executeApi(
@@ -752,13 +880,13 @@
                     return;
                 }
 
-                // Etape 2: Recuperer les taches par iteration sur les IDs
-                // On essaie les IDs de 1 a taskCount*2 (car les IDs peuvent avoir des trous)
+                // Étape 2: Récupérer les tâches par itération sur les IDs
+                // On essaie les IDs de 1 à taskCount*2 (car les IDs peuvent avoir des trous)
                 var tasks = [];
                 var processed = 0;
                 var maxId = taskCount * 3; // Marge pour les IDs manquants
                 var pendingRequests = 0;
-                var targetTasks = Math.min(taskCount, 200); // Limiter a 200 taches max
+                var targetTasks = Math.min(taskCount, 200); // Limiter à 200 tâches max
 
                 function checkComplete() {
                     if (tasks.length >= targetTasks || processed >= maxId) {
@@ -770,7 +898,7 @@
                     }
                 }
 
-                // Charger les taches par lots de 10 requetes simultanees
+                // Charger les tâches par lots de 10 requêtes simultanées
                 function loadBatch(startId) {
                     var batchSize = 10;
                     for (var i = 0; i < batchSize && startId + i <= maxId; i++) {
@@ -802,7 +930,7 @@
                                 function(error) {
                                     pendingRequests--;
                                     processed++;
-                                    // Tache non trouvee - normal, on continue
+                                    // Tâche non trouvée - normal, on continue
                                     if (pendingRequests === 0) {
                                         if (tasks.length < targetTasks && processed < maxId) {
                                             loadBatch(startId + batchSize);
@@ -826,20 +954,28 @@
     }
 
     /**
-     * Met a jour une tache
+     * Met à jour une tâche
+     * Note: L'API PUT /tasks requiert l'objet tâche complet (celui retourné par GET)
+     * Les champs modifiables incluent StartDate, EndDate, etc.
      */
     function updateTask(taskId, taskData, callback) {
         // Note: PUT /tasks sans taskId dans l'URL - le TaskId est dans le body
         var url = "projects/" + stState.currentProjectId + "/tasks";
+
+        // S'assurer que taskData est une string JSON
+        var body = (typeof taskData === 'string') ? taskData : JSON.stringify(taskData);
+
+        log("DEBUG", "Updating task " + taskId + " with body:", body.substring(0, 200) + "...");
 
         spiraAppManager.executeApi(
             "SmartTasks",
             "7.0",
             "PUT",
             url,
-            taskData,
+            body,
             function(response) {
                 stState.taskCache[taskId] = response;
+                log("DEBUG", "Task " + taskId + " updated successfully");
                 callback(true, response);
             },
             function(error) {
@@ -854,7 +990,7 @@
     // ============================================================
 
     /**
-     * Cree le style CSS pour les dialogs
+     * Crée le style CSS pour les dialogs
      */
     function getDialogStyles() {
         return [
@@ -902,7 +1038,7 @@
     }
 
     /**
-     * Injecte les styles si pas deja fait
+     * Injecte les styles si pas déjà fait
      */
     function injectStyles() {
         if (document.getElementById('st-styles')) return;
@@ -914,7 +1050,7 @@
     }
 
     /**
-     * Cree un dialog modal
+     * Crée un dialog modal
      */
     function createDialog(title, bodyContent, footerButtons, options) {
         injectStyles();
@@ -1008,37 +1144,37 @@
     }
 
     // ============================================================
-    // DIALOG: AJOUTER DEPENDANCE
+    // DIALOG: AJOUTER DÉPENDANCE
     // ============================================================
     function showAddDependencyDialog() {
         log("DEBUG", "showAddDependencyDialog");
 
         var currentTaskId = stState.currentTaskId;
         if (!currentTaskId) {
-            showNotification("Aucune tache selectionnee", "error");
+            showNotification("Aucune tâche sélectionnée", "error");
             return;
         }
 
-        // Charger les taches du projet
+        // Charger les tâches du projet
         getProjectTasks(function(tasks) {
             var bodyContent = document.createElement('div');
 
-            // Info tache courante
+            // Info tâche courante
             var currentTask = stState.taskCache[currentTaskId];
             var currentTaskName = currentTask ? currentTask.Name : 'TK-' + currentTaskId;
 
             var infoDiv = document.createElement('div');
             infoDiv.className = 'st-info';
-            infoDiv.innerHTML = '<strong>Tache courante:</strong> TK-' + currentTaskId + ' - ' + escapeHtml(currentTaskName);
+            infoDiv.innerHTML = '<strong>Tâche courante:</strong> TK-' + currentTaskId + ' - ' + escapeHtml(currentTaskName);
             bodyContent.appendChild(infoDiv);
 
-            // Selection du predecesseur
+            // Sélection du prédécesseur
             var predGroup = document.createElement('div');
             predGroup.className = 'st-form-group';
 
             var predLabel = document.createElement('label');
             predLabel.className = 'st-label';
-            predLabel.textContent = 'Predecesseur:';
+            predLabel.textContent = 'Prédécesseur:';
             predGroup.appendChild(predLabel);
 
             var predSelect = document.createElement('select');
@@ -1047,7 +1183,7 @@
 
             var defaultOption = document.createElement('option');
             defaultOption.value = '';
-            defaultOption.textContent = '-- Selectionnez une tache --';
+            defaultOption.textContent = '-- Sélectionnez une tâche --';
             predSelect.appendChild(defaultOption);
 
             tasks.forEach(function(task) {
@@ -1062,13 +1198,13 @@
             predGroup.appendChild(predSelect);
             bodyContent.appendChild(predGroup);
 
-            // Type de dependance
+            // Type de dépendance
             var typeGroup = document.createElement('div');
             typeGroup.className = 'st-form-group';
 
             var typeLabel = document.createElement('label');
             typeLabel.className = 'st-label';
-            typeLabel.textContent = 'Type de dependance:';
+            typeLabel.textContent = 'Type de dépendance:';
             typeGroup.appendChild(typeLabel);
 
             var radioGroup = document.createElement('div');
@@ -1105,7 +1241,7 @@
 
             var lagLabel = document.createElement('label');
             lagLabel.className = 'st-label';
-            lagLabel.textContent = 'Delai (lag/lead) en jours:';
+            lagLabel.textContent = 'Délai (lag/lead) en jours:';
             lagGroup.appendChild(lagLabel);
 
             var lagInput = document.createElement('input');
@@ -1113,7 +1249,7 @@
             lagInput.className = 'st-input';
             lagInput.id = 'st-lag-input';
             lagInput.value = stState.defaultLag;
-            lagInput.placeholder = 'Positif = lag (attente), Negatif = lead (chevauchement)';
+            lagInput.placeholder = 'Positif = lag (attente), Négatif = lead (chevauchement)';
             lagGroup.appendChild(lagInput);
 
             bodyContent.appendChild(lagGroup);
@@ -1124,15 +1260,15 @@
             messageDiv.style.display = 'none';
             bodyContent.appendChild(messageDiv);
 
-            // Creer le dialog
-            createDialog('SmartTasks - Ajouter Dependance', bodyContent, [
+            // Créer le dialog
+            createDialog('SmartTasks - Ajouter Dépendance', bodyContent, [
                 {
                     text: 'Annuler',
                     class: 'st-btn-secondary',
                     onclick: closeDialog
                 },
                 {
-                    text: 'Creer Dependance',
+                    text: 'Créer Dépendance',
                     class: 'st-btn-primary',
                     onclick: function(overlay) {
                         handleAddDependency(overlay, currentTaskId);
@@ -1143,7 +1279,7 @@
     }
 
     /**
-     * Gere la creation d'une dependance
+     * Gère la création d'une dépendance
      */
     function handleAddDependency(overlay, successorId) {
         var predSelect = document.getElementById('st-predecessor-select');
@@ -1153,7 +1289,7 @@
         var predecessorId = parseInt(predSelect.value);
         if (!predecessorId) {
             messageDiv.className = 'st-error';
-            messageDiv.textContent = 'Veuillez selectionner un predecesseur';
+            messageDiv.textContent = 'Veuillez sélectionner un prédécesseur';
             messageDiv.style.display = 'block';
             return;
         }
@@ -1189,13 +1325,10 @@
                 messageDiv.style.display = 'block';
             }
 
-            // Ajouter la dependance
-            var newDependencies = stState.dependencies.slice();
-            newDependencies.push(newDependency);
-
-            saveDependenciesToCustomProperty(newDependencies, function(success, error) {
+            // Créer l'association via l'API SpiraPlan
+            createAssociation(successorId, predecessorId, linkType, lag, function(success, error) {
                 if (success) {
-                    showNotification('Dependance creee avec succes!', 'success');
+                    showNotification('Dépendance créée avec succès!', 'success');
                     closeDialog(overlay);
 
                     if (stState.autoCalculate) {
@@ -1211,14 +1344,14 @@
     }
 
     // ============================================================
-    // DIALOG: VOIR DEPENDANCES
+    // DIALOG: VOIR DÉPENDANCES
     // ============================================================
     function showDependenciesDialog() {
         log("DEBUG", "showDependenciesDialog");
 
         var currentTaskId = stState.currentTaskId;
         if (!currentTaskId) {
-            showNotification("Aucune tache selectionnee", "error");
+            showNotification("Aucune tâche sélectionnée", "error");
             return;
         }
 
@@ -1230,19 +1363,19 @@
             var currentTask = stState.taskCache[currentTaskId];
             var currentTaskName = currentTask ? currentTask.Name : 'TK-' + currentTaskId;
 
-            // Titre de la tache
+            // Titre de la tâche
             var titleDiv = document.createElement('div');
             titleDiv.className = 'st-info';
             titleDiv.innerHTML = '<strong>TK-' + currentTaskId + ':</strong> ' + escapeHtml(currentTaskName);
             bodyContent.appendChild(titleDiv);
 
-            // Predecesseurs
+            // Prédécesseurs
             var predsSection = document.createElement('div');
             predsSection.className = 'st-section';
 
             var predsTitle = document.createElement('div');
             predsTitle.className = 'st-section-title';
-            predsTitle.textContent = 'Predecesseurs (cette tache attend):';
+            predsTitle.textContent = 'Prédécesseurs (cette tâche attend):';
             predsSection.appendChild(predsTitle);
 
             var predecessors = stState.dependencies.filter(function(dep) {
@@ -1252,7 +1385,7 @@
             if (predecessors.length === 0) {
                 var noPreds = document.createElement('p');
                 noPreds.style.color = '#666';
-                noPreds.textContent = 'Aucun predecesseur';
+                noPreds.textContent = 'Aucun prédécesseur';
                 predsSection.appendChild(noPreds);
             } else {
                 var predsList = document.createElement('ul');
@@ -1277,7 +1410,7 @@
                     deleteBtn.className = 'st-btn st-btn-danger';
                     deleteBtn.textContent = 'Supprimer';
                     deleteBtn.onclick = function() {
-                        deleteDependency(dep.id);
+                        deleteDependency(dep.linkId);
                     };
 
                     actions.appendChild(deleteBtn);
@@ -1298,7 +1431,7 @@
 
             var succsTitle = document.createElement('div');
             succsTitle.className = 'st-section-title';
-            succsTitle.textContent = 'Successeurs (attendent cette tache):';
+            succsTitle.textContent = 'Successeurs (attendent cette tâche):';
             succsSection.appendChild(succsTitle);
 
             var successors = stState.dependencies.filter(function(dep) {
@@ -1333,7 +1466,7 @@
                     deleteBtn.className = 'st-btn st-btn-danger';
                     deleteBtn.textContent = 'Supprimer';
                     deleteBtn.onclick = function() {
-                        deleteDependency(dep.id);
+                        deleteDependency(dep.linkId);
                     };
 
                     actions.appendChild(deleteBtn);
@@ -1348,8 +1481,8 @@
 
             bodyContent.appendChild(succsSection);
 
-            // Creer le dialog
-            createDialog('SmartTasks - Dependances de TK-' + currentTaskId, bodyContent, [
+            // Créer le dialog
+            createDialog('SmartTasks - Dépendances de TK-' + currentTaskId, bodyContent, [
                 {
                     text: 'Ajouter',
                     class: 'st-btn-secondary',
@@ -1376,17 +1509,14 @@
     }
 
     /**
-     * Supprime une dependance
+     * Supprime une dépendance via l'API Associations
+     * @param {number} linkId - L'ID de l'association SpiraPlan
      */
-    function deleteDependency(depId) {
-        var newDependencies = stState.dependencies.filter(function(dep) {
-            return dep.id !== depId;
-        });
-
-        saveDependenciesToCustomProperty(newDependencies, function(success, error) {
+    function deleteDependency(linkId) {
+        deleteAssociation(linkId, function(success, error) {
             if (success) {
-                showNotification('Dependance supprimee', 'success');
-                // Rafraichir le dialog
+                showNotification('Dépendance supprimée', 'success');
+                // Rafraîchir le dialog
                 var overlay = document.querySelector('.st-overlay');
                 if (overlay) {
                     closeDialog(overlay);
@@ -1408,15 +1538,15 @@
 
         getProjectTasks(function(tasks) {
             if (tasks.length === 0) {
-                showNotification('Aucune tache trouvee', 'warning');
+                showNotification('Aucune tâche trouvée', 'warning');
                 return;
             }
 
-            // Collecter toutes les dependances
+            // Collecter toutes les dépendances
             var allDependencies = collectAllDependencies(tasks);
 
             if (allDependencies.length === 0) {
-                showNotification('Aucune dependance trouvee', 'info');
+                showNotification('Aucune dépendance trouvée', 'info');
                 return;
             }
 
@@ -1429,7 +1559,7 @@
             }
 
             if (result.changes.length === 0) {
-                showNotification('Aucune modification necessaire', 'success');
+                showNotification('Aucune modification nécessaire', 'success');
                 return;
             }
 
@@ -1439,23 +1569,23 @@
     }
 
     /**
-     * Collecte toutes les dependances (pour l'instant juste celles de la tache courante)
+     * Collecte toutes les dépendances (pour l'instant juste celles de la tâche courante)
      */
     function collectAllDependencies(tasks) {
-        // TODO: Pour une version plus complete, parcourir toutes les taches
-        // et collecter leurs dependances depuis les Custom Properties
+        // TODO: Pour une version plus complète, parcourir toutes les tâches
+        // et collecter leurs dépendances depuis les Custom Properties
         return stState.dependencies;
     }
 
     /**
-     * Affiche les resultats du recalcul
+     * Affiche les résultats du recalcul
      */
     function showRecalculationResults(changes) {
         var bodyContent = document.createElement('div');
 
         var infoDiv = document.createElement('div');
         infoDiv.className = 'st-success';
-        infoDiv.innerHTML = '<strong>' + changes.length + ' tache(s)</strong> ont ete recalculees.';
+        infoDiv.innerHTML = '<strong>' + changes.length + ' tâche(s)</strong> ont été recalculées.';
         bodyContent.appendChild(infoDiv);
 
         var listSection = document.createElement('div');
@@ -1481,7 +1611,7 @@
         listSection.appendChild(list);
         bodyContent.appendChild(listSection);
 
-        createDialog('SmartTasks - Resultats du Recalcul', bodyContent, [
+        createDialog('SmartTasks - Résultats du Recalcul', bodyContent, [
             {
                 text: 'Appliquer les modifications',
                 class: 'st-btn-primary',
@@ -1499,18 +1629,18 @@
 
     /**
      * Applique les modifications de dates
-     * Note: L'API PUT /tasks requiert l'objet tache complet
+     * Note: L'API PUT /tasks requiert l'objet tâche complet
      */
     function applyDateChanges(changes, overlay) {
         var completed = 0;
         var errors = [];
 
         changes.forEach(function(change) {
-            // Recuperer d'abord la tache complete depuis le cache ou l'API
+            // Récupérer d'abord la tâche complète depuis le cache ou l'API
             getTaskDetails(change.taskId, function(fullTask) {
                 if (!fullTask) {
                     completed++;
-                    errors.push('TK-' + change.taskId + ': Tache non trouvee');
+                    errors.push('TK-' + change.taskId + ': Tâche non trouvée');
                     checkComplete();
                     return;
                 }
@@ -1519,7 +1649,7 @@
                 fullTask.StartDate = formatDateISO(change.newStartDate);
                 fullTask.EndDate = formatDateISO(change.newEndDate);
 
-                // Envoyer l'objet complet pour la mise a jour
+                // Envoyer l'objet complet pour la mise à jour
                 updateTask(change.taskId, fullTask, function(success, err) {
                     completed++;
 
@@ -1537,16 +1667,16 @@
                 closeDialog(overlay);
 
                 if (errors.length === 0) {
-                    showNotification('Toutes les dates ont ete mises a jour!', 'success');
+                    showNotification('Toutes les dates ont été mises à jour!', 'success');
                 } else {
-                    showNotification('Certaines mises a jour ont echoue: ' + errors.join(', '), 'warning');
+                    showNotification('Certaines mises à jour ont échoué: ' + errors.join(', '), 'warning');
                 }
             }
         }
     }
 
     /**
-     * Declenchement du recalcul automatique
+     * Déclenchement du recalcul automatique
      */
     function triggerAutoRecalculation() {
         if (!stState.autoCalculate) return;
@@ -1566,20 +1696,20 @@
             }
 
             if (result.changes.length > 0) {
-                showNotification(result.changes.length + ' tache(s) peuvent etre recalculees. Utilisez "Recalculer Dates" pour appliquer.', 'info');
+                showNotification(result.changes.length + ' tâche(s) peuvent être recalculées. Utilisez "Recalculer Dates" pour appliquer.', 'info');
             }
         });
     }
 
     // ============================================================
-    // ANALYSE DE LA CHAINE
+    // ANALYSE DE LA CHAÎNE
     // ============================================================
     function analyzeChain() {
         log("DEBUG", "analyzeChain");
 
         var currentTaskId = stState.currentTaskId;
         if (!currentTaskId) {
-            showNotification("Aucune tache selectionnee", "error");
+            showNotification("Aucune tâche sélectionnée", "error");
             return;
         }
 
@@ -1587,7 +1717,7 @@
             var allDependencies = collectAllDependencies(tasks);
 
             if (allDependencies.length === 0) {
-                showNotification('Aucune dependance trouvee', 'info');
+                showNotification('Aucune dépendance trouvée', 'info');
                 return;
             }
 
@@ -1596,32 +1726,32 @@
 
             var bodyContent = document.createElement('div');
 
-            // Verification des cycles
+            // Vérification des cycles
             var cycleSection = document.createElement('div');
             cycleSection.className = 'st-section';
 
             if (circularCheck.hasCircular) {
                 var cycleWarning = document.createElement('div');
                 cycleWarning.className = 'st-error';
-                cycleWarning.innerHTML = '<strong>Attention!</strong> Des dependances circulaires ont ete detectees:<br>' +
+                cycleWarning.innerHTML = '<strong>Attention!</strong> Des dépendances circulaires ont été détectées:<br>' +
                     circularCheck.cycles.map(function(c) { return c.description; }).join('<br>');
                 cycleSection.appendChild(cycleWarning);
             } else {
                 var noCycle = document.createElement('div');
                 noCycle.className = 'st-success';
-                noCycle.textContent = 'Aucune dependance circulaire detectee';
+                noCycle.textContent = 'Aucune dépendance circulaire détectée';
                 cycleSection.appendChild(noCycle);
             }
 
             bodyContent.appendChild(cycleSection);
 
-            // Chaine de la tache courante
+            // Chaîne de la tâche courante
             var chainSection = document.createElement('div');
             chainSection.className = 'st-section';
 
             var chainTitle = document.createElement('div');
             chainTitle.className = 'st-section-title';
-            chainTitle.textContent = 'Chaine de dependances pour TK-' + currentTaskId + ':';
+            chainTitle.textContent = 'Chaîne de dépendances pour TK-' + currentTaskId + ':';
             chainSection.appendChild(chainTitle);
 
             var chainDiv = document.createElement('div');
@@ -1648,7 +1778,7 @@
                 }).join(' --> ');
             }
 
-            chainDiv.innerHTML = chainHtml || 'Tache isolee (pas de dependances)';
+            chainDiv.innerHTML = chainHtml || 'Tâche isolée (pas de dépendances)';
             chainSection.appendChild(chainDiv);
 
             bodyContent.appendChild(chainSection);
@@ -1665,17 +1795,17 @@
             var statsDiv = document.createElement('div');
             statsDiv.className = 'st-info';
             statsDiv.innerHTML =
-                '<strong>Total taches:</strong> ' + tasks.length + '<br>' +
-                '<strong>Total dependances:</strong> ' + allDependencies.length + '<br>' +
-                '<strong>Predecesseurs directs:</strong> ' + (graph.predecessors[currentTaskId] || []).length + '<br>' +
+                '<strong>Total tâches:</strong> ' + tasks.length + '<br>' +
+                '<strong>Total dépendances:</strong> ' + allDependencies.length + '<br>' +
+                '<strong>Prédécesseurs directs:</strong> ' + (graph.predecessors[currentTaskId] || []).length + '<br>' +
                 '<strong>Successeurs directs:</strong> ' + (graph.successors[currentTaskId] || []).length + '<br>' +
-                '<strong>Profondeur chaine amont:</strong> ' + ancestors.length + '<br>' +
-                '<strong>Profondeur chaine aval:</strong> ' + descendants.length;
+                '<strong>Profondeur chaîne amont:</strong> ' + ancestors.length + '<br>' +
+                '<strong>Profondeur chaîne aval:</strong> ' + descendants.length;
 
             statsSection.appendChild(statsDiv);
             bodyContent.appendChild(statsSection);
 
-            createDialog('SmartTasks - Analyse de la Chaine', bodyContent, [
+            createDialog('SmartTasks - Analyse de la Chaîne', bodyContent, [
                 {
                     text: 'Fermer',
                     class: 'st-btn-primary',
@@ -1686,7 +1816,7 @@
     }
 
     /**
-     * Trouve les ancetres d'une tache (predecesseurs recursifs)
+     * Trouve les ancêtres d'une tâche (prédécesseurs récursifs)
      */
     function findAncestors(taskId, graph, visited) {
         visited = visited || {};
@@ -1707,7 +1837,7 @@
     }
 
     /**
-     * Trouve les descendants d'une tache (successeurs recursifs)
+     * Trouve les descendants d'une tâche (successeurs récursifs)
      */
     function findDescendants(taskId, graph, visited) {
         visited = visited || {};

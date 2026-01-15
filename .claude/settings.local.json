@@ -69,7 +69,16 @@
       "Bash(cmd /c \"cd /d d:\\\\RRRR\\\\SpiraApps\\\\spiraapp-package-generator && node index.js\")",
       "Bash(cmd /c \"set npm_config_input=d:\\\\RRRR\\\\SpiraApps\\\\SpiraXCapture&& set npm_config_output=d:\\\\RRRR\\\\SpiraApps\\\\SpiraXCapture&& cd /d d:\\\\RRRR\\\\SpiraApps\\\\spiraapp-package-generator && node index.js\")",
       "Bash(cmd /c \"d:\\\\RRRR\\\\SpiraApps\\\\SpiraXCapture\\\\build.bat\")",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(set npm_config_input=d:RRRRSpiraAppsSmartTasks)",
+      "Bash(set npm_config_output=d:RRRRSpiraAppsSmartTasks)",
+      "Bash(cmd /c:*)",
+      "Bash(Select-String -Pattern \"Test 5|SUCCESS|ERROR\")",
+      "Bash(Select-Object -Last 30)",
+      "Bash(Select-String -Pattern \"Test 10|Test 11|SUCCESS|ERROR|Structure|Task\")",
+      "Bash(Select-Object -Last 50)",
+      "Bash({type})",
+      "Bash({lag}\"\n- Fix PUT /tasks to send complete task object with JSON.stringify\n- Correct all French accents in UI messages and comments\n- Update test_api.ps1 with comprehensive API tests\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
