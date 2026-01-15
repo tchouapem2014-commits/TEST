@@ -17,10 +17,12 @@ Injecter automatiquement un template de texte formate (HTML) dans les champs Ric
 - Exemples de types : Business Requirement, Functional Requirement, User Story, etc.
 - Si aucun template n'est defini pour un type, le champ reste vide
 
-#### 2.2 Champs RichText Supportes
-- **Champs standards** : Description, ou tout autre champ RichText natif
-- **Champs personnalises** : Custom Properties de type RichText (settingTypeId: 2)
-- L'administrateur peut choisir quel(s) champ(s) cibler
+#### 2.2 Champs RichText Supportes (v2.0)
+
+- **Champs standards** : Description (par defaut), ou tout autre champ RichText natif
+- **Champs personnalises** : Custom Properties de type RichText (Custom_01, Custom_02, etc.)
+- L'administrateur configure le champ cible dans les Product Settings
+- Si non configure, le champ Description est utilise par defaut (retrocompatibilite)
 
 #### 2.3 Configuration via Admin SpiraApp
 Parametres configurables au niveau produit (Product Settings) :
@@ -34,15 +36,15 @@ L'injection se declenche automatiquement dans deux cas :
 
 1. **Au chargement de la page** (avec un delai de 500ms) :
    - L'utilisateur ouvre une exigence (nouvelle ou existante)
-   - Si le champ Description est vide, le template correspondant au type actuel est injecte
+   - Si le champ cible est vide, le template correspondant au type actuel est injecte
 
 2. **Au changement de type d'exigence** :
    - L'utilisateur modifie le type dans le dropdown RequirementTypeId
-   - Si le champ Description est vide, le template du nouveau type est injecte
+   - Si le champ cible est vide, le template du nouveau type est injecte
 
-**Protection du contenu existant** : Si le champ Description contient deja du texte, aucune injection n'est effectuee. Le contenu de l'utilisateur est toujours preserve.
+**Protection du contenu existant** : Si le champ cible contient deja du texte, aucune injection n'est effectuee. Le contenu de l'utilisateur est toujours preserve.
 
-> **Note** : Spira cree immediatement un artefact avec un ID quand on clique sur "New". Il n'y a donc pas de distinction entre mode creation et mode edition. L'injection se base uniquement sur le contenu du champ Description.
+> **Note** : Spira cree immediatement un artefact avec un ID quand on clique sur "New". Il n'y a donc pas de distinction entre mode creation et mode edition. L'injection se base uniquement sur le contenu du champ cible.
 
 #### 2.5 Bouton d'Injection Manuelle (v1.1)
 
@@ -52,8 +54,8 @@ Un bouton "Injecter Template" est disponible sur la page de detail d'une exigenc
 
 1. Le bouton apparait dans la barre d'outils de la page RequirementDetails
 2. Au clic :
-   - **Si le champ Description est vide** : le template correspondant au type actuel est injecte
-   - **Si le champ Description contient du texte** : un message d'avertissement informe l'utilisateur que le champ n'est pas vide
+   - **Si le champ cible est vide** : le template correspondant au type actuel est injecte
+   - **Si le champ cible contient du texte** : un message d'avertissement informe l'utilisateur que le champ n'est pas vide
 3. Fonctionne en mode creation ET en mode edition (pour recharger un template si besoin)
 
 **Cas d'usage :**
@@ -77,22 +79,26 @@ guid: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 name: "RequirementTemplateInjector"
 caption: "Requirement Template Injector"
 summary: "Injecte des templates dans les champs RichText des exigences"
-version: "1.0.0"
+version: "2.0.0"
 
 productSettings:
-  - name: "targetField"
+  # Champ cible (v2.0) - texte libre pour supporter standard et custom
+  - name: "target_field"
     caption: "Champ RichText cible"
-    settingTypeId: 7  # ArtifactStandardField ou 3 pour CustomProperty
-    artifactTypeId: 1
+    settingTypeId: 1  # String (ex: Description, Custom_01)
+    placeholder: "Description"
 
-  - name: "templates"
-    caption: "Templates par type (format JSON)"
-    settingTypeId: 9  # Multi line plain text
+  # 5 slots type + template
+  - name: "type_id_1"
+    settingTypeId: 11  # ArtifactTypeSingleSelect
+    artifactTypeId: 1
+  - name: "template_1"
+    settingTypeId: 2   # RichText
 
 pageContents:
   - pageId: 9
-    name: "templateInjector"
-    code: file://code/injector.js
+    name: "injector"
+    code: file://injector.js
 ```
 
 #### 3.3 Format de Configuration des Templates
@@ -118,17 +124,21 @@ pageContents:
 ### 4. Logique du Code
 
 ```javascript
-// Pseudo-code de la logique principale v1.5.0
+// Pseudo-code de la logique principale v2.0.0
 
-// 1. Ecouter l'evenement loaded (page chargee)
-// 2. Ecouter l'evenement dropdownChanged sur RequirementTypeId
-// 3. Pour chaque evenement: verifier si Description est vide
-// 4. Si vide, injecter le template correspondant au type actuel
+// 1. Charger le champ cible depuis settings (fallback: Description)
+// 2. Ecouter l'evenement loaded (page chargee)
+// 3. Ecouter l'evenement dropdownChanged sur RequirementTypeId
+// 4. Pour chaque evenement: verifier si le champ cible est vide
+// 5. Si vide, injecter le template correspondant au type actuel
+
+// Chargement du champ cible
+var targetField = state.settings.target_field || "Description";
 
 // Handler pour le chargement de la page
 spiraAppManager.registerEvent_loaded(function() {
     setTimeout(function() {
-        var currentValue = spiraAppManager.getDataItemField("Description", "textValue");
+        var currentValue = spiraAppManager.getDataItemField(targetField, "textValue");
         if (!currentValue || currentValue.trim() === "") {
             injectTemplateForCurrentType();
         }
@@ -137,7 +147,7 @@ spiraAppManager.registerEvent_loaded(function() {
 
 // Handler pour le changement de type
 spiraAppManager.registerEvent_dropdownChanged("RequirementTypeId", function(oldValue, newValue) {
-    var currentValue = spiraAppManager.getDataItemField("Description", "textValue");
+    var currentValue = spiraAppManager.getDataItemField(targetField, "textValue");
     if (!currentValue || currentValue.trim() === "") {
         injectTemplateForType(String(newValue));
     }
@@ -148,8 +158,8 @@ function injectTemplateForType(typeId) {
     var template = state.templates[typeId];
     if (template) {
         // IMPORTANT: utiliser la signature a 3 parametres pour RichText
-        spiraAppManager.updateFormField("Description", "textValue", template);
-        spiraAppManager.displaySuccessMessage("[RTI] Template injecte");
+        spiraAppManager.updateFormField(targetField, "textValue", template);
+        spiraAppManager.displaySuccessMessage("[RTI] Template injecte dans " + targetField);
     }
 }
 ```
@@ -222,17 +232,19 @@ function injectTemplateForType(typeId) {
 4. **Performance** : Charger les templates une seule fois au demarrage depuis `SpiraAppSettings`.
 5. **Delai au chargement** : Utiliser un `setTimeout` de 500ms apres `registerEvent_loaded` pour laisser le formulaire se charger completement.
 6. **SpiraAppSettings** : Verifier que `SpiraAppSettings` est disponible avant d'initialiser (peut necessiter un delai).
+7. **Champs custom** : Les champs personnalises RichText sont accessibles via `Custom_01`, `Custom_02`, etc. Utiliser le meme `textValue` que pour les champs standards.
+8. **Retrocompatibilite** : Si `target_field` n'est pas configure, utiliser `Description` par defaut.
 
 ---
 
 ### 7. Roadmap
 
-| Phase | Description | Priorite |
-|-------|-------------|----------|
-| v1.0 | Template sur champ Description standard | Haute |
-| v1.1 | Support des champs Custom RichText | Moyenne |
-| v1.2 | Interface de configuration visuelle des templates | Basse |
-| v1.3 | Import/Export des templates | Basse |
+- **v1.0** : Template sur champ Description standard - Done
+- **v1.1** : Bouton d'injection manuelle - Done
+- **v1.5** : Injection auto au chargement + changement de type - Done
+- **v2.0** : Support de n'importe quel champ RichText - Done
+- **v2.1** : Interface de configuration visuelle des templates - Planned
+- **v2.2** : Import/Export des templates - Planned
 
 ---
 
@@ -250,4 +262,4 @@ RequirementTemplateInjector/
 ---
 
 *Document cree le 2025-01-08*
-*Mis a jour le 2026-01-14 - v1.5.0*
+*Mis a jour le 2026-01-14 - v2.0.0*

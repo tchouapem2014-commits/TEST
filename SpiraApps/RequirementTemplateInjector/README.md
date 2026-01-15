@@ -4,17 +4,19 @@
 
 ## Description
 
-**Requirement Template Injector (RTI)** est une SpiraApp qui injecte automatiquement des templates HTML formatés dans le champ Description lors de la création de nouvelles exigences dans SpiraPlan.
+**Requirement Template Injector (RTI)** est une SpiraApp qui injecte automatiquement des templates HTML formatés dans n'importe quel champ RichText lors de la création de nouvelles exigences dans SpiraPlan.
 
 ### Fonctionnalités
 
 - Injection automatique de templates au chargement de la page
 - Re-injection lors du changement de type d'exigence
+- **Champ cible configurable** : Description (défaut) ou tout champ RichText (Custom_01, etc.) (v2.0)
 - **Bouton "Injecter Template"** dans la toolbar pour injection manuelle (v1.1)
 - 5 slots configurables (type + template)
 - Éditeur RichText WYSIWYG pour configurer les templates
 - Dropdown natif pour sélectionner les types d'exigences
 - Protection du contenu modifié par l'utilisateur
+- Rétrocompatible avec les versions précédentes
 - Mode debug avec logs console (F12)
 
 ## Installation
@@ -52,6 +54,14 @@ Le fichier `.spiraapp` sera généré : `b3f5a8d2-7c41-4e9a-b6d8-1f2e3a4b5c6d.sp
 
 ![Configuration RTI](docs/config-screenshot.png)
 
+### Champ cible (v2.0)
+
+1. **Champ RichText cible** : Entrez le nom du champ (ex: `Description`, `Custom_01`, `Custom_02`)
+   - Laissez vide pour utiliser `Description` par défaut
+   - Les champs custom sont accessibles via leur nom technique (Custom_XX)
+
+### Slots de templates
+
 Pour chaque slot (1-5) :
 
 1. **Type d'exigence** : Sélectionnez dans le dropdown (Feature, User Story, Need, etc.)
@@ -69,13 +79,13 @@ L'injection se declenche automatiquement dans deux cas :
 
 1. **Au chargement de la page** (avec un delai de 500ms) :
    - L'utilisateur ouvre une exigence (nouvelle ou existante)
-   - Si le champ Description est vide, le template correspondant au type actuel est injecte
+   - Si le champ cible est vide, le template correspondant au type actuel est injecte
 
 2. **Au changement de type d'exigence** :
    - L'utilisateur modifie le type dans le dropdown RequirementTypeId
-   - Si le champ Description est vide, le template du nouveau type est injecte
+   - Si le champ cible est vide, le template du nouveau type est injecte
 
-**Protection du contenu existant** : Si le champ Description contient deja du texte, aucune injection n'est effectuee. Le contenu de l'utilisateur est toujours preserve.
+**Protection du contenu existant** : Si le champ cible contient deja du texte, aucune injection n'est effectuee. Le contenu de l'utilisateur est toujours preserve.
 
 ### Bouton "Injecter Template" (v1.1)
 
@@ -83,12 +93,12 @@ Un bouton **RTI > Injecter Template** est disponible dans la toolbar de la page 
 
 **Comportement au clic :**
 
-- **Si le champ Description est vide** : le template correspondant au type actuel est injecte
-- **Si le champ Description contient du texte** : un message d'avertissement s'affiche pour informer que le champ n'est pas vide
+- **Si le champ cible est vide** : le template correspondant au type actuel est injecte
+- **Si le champ cible contient du texte** : un message d'avertissement s'affiche pour informer que le champ n'est pas vide
 
 **Cas d'usage :**
 
-- Recharger un template apres avoir vide le champ Description
+- Recharger un template apres avoir vide le champ cible
 - Forcer l'injection sur une exigence existante (vider d'abord le champ)
 - Tester la configuration des templates
 
@@ -163,19 +173,18 @@ RequirementTemplateInjector/
 | `registerEvent_dropdownChanged` | Re-injection au changement de type |
 | `registerEvent_menuEntryClick` | Gestion du clic sur le bouton menu |
 | `getDataItemField` | Lecture des valeurs de champs |
-| `updateFormField` | Mise à jour du champ Description |
+| `updateFormField` | Mise à jour du champ cible |
 | `displaySuccessMessage` | Notification utilisateur (succès) |
 | `displayWarningMessage` | Notification utilisateur (avertissement) |
 | `SpiraAppSettings` | Lecture des settings configurés |
 
 ## Changelog
 
-| Version | Date       | Description                                          |
-|---------|------------|------------------------------------------------------|
-| 1.5.0   | 2026-01-14 | Injection auto au chargement + changement de type    |
-| 1.4.0   | 2026-01-14 | Injection via dropdownChanged sur RequirementTypeId  |
-| 1.1.0   | 2026-01-14 | Ajout du bouton "Injecter Template" dans la toolbar  |
-| 1.0.0   | 2026-01-14 | Version initiale - 5 slots dropdown + RichText       |
+- **v2.0.0** (2026-01-14) : Support de n'importe quel champ RichText
+- **v1.5.0** (2026-01-14) : Injection auto au chargement + changement de type
+- **v1.4.0** (2026-01-14) : Injection via dropdownChanged sur RequirementTypeId
+- **v1.1.0** (2026-01-14) : Ajout du bouton "Injecter Template" dans la toolbar
+- **v1.0.0** (2026-01-14) : Version initiale - 5 slots dropdown + RichText
 
 ## Licence
 

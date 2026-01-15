@@ -1,6 +1,6 @@
 /**
  * REQUIREMENT TEMPLATE INJECTOR (RTI)
- * Version 1.5.0
+ * Version 2.0.0
  *
  * Approche: loaded (delai 500ms) + dropdownChanged + bouton manuel
  * Configuration: 5 SLOTS (dropdown type natif + template RichText)
@@ -11,12 +11,14 @@
  * v1.3.0: Retour a registerEvent_loaded avec delai 500ms (dataPreSave ne fonctionne pas)
  * v1.4.0: Injection via registerEvent_dropdownChanged sur RequirementTypeId
  * v1.5.0: Combine loaded + dropdownChanged pour couvrir tous les cas
+ * v2.0.0: Support de n'importe quel champ RichText (standard ou custom)
  */
 
 // ============================================================
 // CONSTANTES
 // ============================================================
-var RTI_VERSION = "1.5.0";
+var RTI_VERSION = "2.0.0";
+var RTI_DEFAULT_TARGET_FIELD = "Description";
 var RTI_PREFIX = "[RTI]";
 var RTI_GUID = "b3f5a8d2-7c41-4e9a-b6d8-1f2e3a4b5c6d";
 var NUM_SLOTS = 5;
@@ -27,6 +29,7 @@ var NUM_SLOTS = 5;
 var state = {
     settings: null,
     templates: {},           // Map: typeId (string) -> template HTML
+    targetField: RTI_DEFAULT_TARGET_FIELD,  // Champ RichText cible (v2.0)
     debugMode: false
 };
 
@@ -86,6 +89,7 @@ function initRTI() {
     }
 
     console.log(RTI_PREFIX + " Settings loaded, templates count: " + Object.keys(state.templates).length);
+    console.log(RTI_PREFIX + " Target field: " + state.targetField);
 
     // Enregistrer event loaded pour injection au chargement initial (mode creation)
     spiraAppManager.registerEvent_loaded(onPageLoaded);
@@ -115,6 +119,15 @@ function loadSettings() {
     state.debugMode = (state.settings.debug_mode === true ||
                        state.settings.debug_mode === "Y");
 
+    // Champ cible (v2.0) - fallback sur Description si non configure
+    var configuredField = state.settings.target_field;
+    if (configuredField && configuredField.trim() !== "") {
+        state.targetField = configuredField.trim();
+    } else {
+        state.targetField = RTI_DEFAULT_TARGET_FIELD;
+    }
+    log("DEBUG", "Target field configured:", state.targetField);
+
     // Charger les templates depuis les slots (dropdown retourne directement l'ID)
     state.templates = {};
 
@@ -142,29 +155,29 @@ function loadSettings() {
 }
 
 // ============================================================
-// HANDLER: PAGE LOADED (injection si Description vide)
+// HANDLER: PAGE LOADED (injection si champ cible vide)
 // ============================================================
 function onPageLoaded() {
     console.log(RTI_PREFIX + " onPageLoaded() triggered");
     console.log(RTI_PREFIX + " artifactId = " + spiraAppManager.artifactId);
 
-    console.log(RTI_PREFIX + " Will check Description after 500ms delay");
+    console.log(RTI_PREFIX + " Will check " + state.targetField + " after 500ms delay");
 
     // Delai pour laisser le formulaire se charger completement
     setTimeout(function() {
         console.log(RTI_PREFIX + " Delayed check starting now...");
 
-        // Verifier si le champ Description est vide
-        var currentValue = spiraAppManager.getDataItemField("Description", "textValue");
-        console.log(RTI_PREFIX + " Current Description: " + (currentValue ? currentValue.substring(0, 50) : "(empty)"));
+        // Verifier si le champ cible est vide
+        var currentValue = spiraAppManager.getDataItemField(state.targetField, "textValue");
+        console.log(RTI_PREFIX + " Current " + state.targetField + ": " + (currentValue ? currentValue.substring(0, 50) : "(empty)"));
 
         if (currentValue && currentValue.trim() !== "") {
-            console.log(RTI_PREFIX + " Description not empty, skipping injection");
+            console.log(RTI_PREFIX + " " + state.targetField + " not empty, skipping injection");
             return;
         }
 
         // Injecter le template pour le type actuel
-        console.log(RTI_PREFIX + " Description is empty, calling injectTemplateForCurrentType()");
+        console.log(RTI_PREFIX + " " + state.targetField + " is empty, calling injectTemplateForCurrentType()");
         injectTemplateForCurrentType();
     }, 500);
 }
@@ -182,14 +195,14 @@ function onTypeChanged(oldValue, newValue) {
         return;
     }
 
-    console.log(RTI_PREFIX + " Checking Description field...");
+    console.log(RTI_PREFIX + " Checking " + state.targetField + " field...");
 
-    // Verifier si le champ Description est vide
-    var currentValue = spiraAppManager.getDataItemField("Description", "textValue");
-    console.log(RTI_PREFIX + " Current Description: " + (currentValue ? currentValue.substring(0, 50) : "(empty)"));
+    // Verifier si le champ cible est vide
+    var currentValue = spiraAppManager.getDataItemField(state.targetField, "textValue");
+    console.log(RTI_PREFIX + " Current " + state.targetField + ": " + (currentValue ? currentValue.substring(0, 50) : "(empty)"));
 
     if (currentValue && currentValue.trim() !== "") {
-        console.log(RTI_PREFIX + " Description not empty, skipping injection");
+        console.log(RTI_PREFIX + " " + state.targetField + " not empty, skipping injection");
         return;
     }
 
@@ -214,13 +227,13 @@ function injectTemplateForType(typeId) {
         return;
     }
 
-    // Injecter - utiliser la signature a 3 parametres avec "textValue" explicite
-    console.log(RTI_PREFIX + " Injecting template for type ID " + typeId);
+    // Injecter dans le champ cible - utiliser la signature a 3 parametres avec "textValue" explicite
+    console.log(RTI_PREFIX + " Injecting template into " + state.targetField + " for type ID " + typeId);
     console.log(RTI_PREFIX + " Template content (first 100 chars): " + template.substring(0, 100));
-    spiraAppManager.updateFormField("Description", "textValue", template);
+    spiraAppManager.updateFormField(state.targetField, "textValue", template);
 
     // Message de succes
-    spiraAppManager.displaySuccessMessage("[RTI] Template injecte pour le type selectionne");
+    spiraAppManager.displaySuccessMessage("[RTI] Template injecte dans " + state.targetField);
 }
 
 // Injecter le template pour le type courant (utilise par le bouton et RTI_injectNow)
@@ -260,16 +273,16 @@ function registerMenuHandler() {
 function onInjectButtonClick() {
     log("DEBUG", "Inject button clicked");
 
-    // Recuperer la valeur actuelle du champ Description
-    var currentValue = spiraAppManager.getDataItemField("Description", "textValue");
+    // Recuperer la valeur actuelle du champ cible
+    var currentValue = spiraAppManager.getDataItemField(state.targetField, "textValue");
 
     // Verifier si le champ est vide
     if (currentValue && currentValue.trim() !== "") {
         // Champ non vide - afficher un message d'avertissement
         spiraAppManager.displayWarningMessage(
-            "[RTI] Le champ Description n'est pas vide. Videz-le d'abord pour injecter un template."
+            "[RTI] Le champ " + state.targetField + " n'est pas vide. Videz-le d'abord pour injecter un template."
         );
-        log("INFO", "Injection blocked: Description field is not empty");
+        log("INFO", "Injection blocked: " + state.targetField + " field is not empty");
         return;
     }
 

@@ -1704,6 +1704,254 @@ spiraAppManager.registerEvent_dataSaved(function(operation, newId) {
 | 1.2.0 | 2025-01-14 | Ajout noms de champs par artefact, gridIds, fieldTypes, dataProperties, section storage |
 | 1.3.0 | 2025-01-14 | Signatures completes Storage API, executeApiAsync, createComboDialog, registerEvent_menuEntryClick, parametres evenements |
 | 1.4.0 | 2025-01-14 | Analyse samples: reponse executeRest wrappee, API associations, projectTemplateId, tokens ${} vs {}, window.location.origin |
+| 1.5.0 | 2026-01-14 | Pieges courants: updateFormField signatures, initialisation SpiraAppSettings, debugging |
+
+---
+
+## 13. Pieges Courants et Resolutions
+
+Cette section documente les problemes frequemment rencontres lors du developpement de SpiraApps et leurs solutions.
+
+### 13.1 Signature de updateFormField pour les Champs RichText
+
+**Probleme** : `updateFormField` est appele mais le champ Description (ou autre RichText) ne se met pas a jour visuellement.
+
+**Cause** : La signature a 2 parametres ne fonctionne pas toujours pour les champs RichText.
+
+**Solution** : Utiliser la signature a 3 parametres avec `"textValue"` explicite.
+
+```javascript
+// ❌ NE FONCTIONNE PAS TOUJOURS pour RichText
+spiraAppManager.updateFormField("Description", template);
+
+// ✅ FONCTIONNE - Signature a 3 parametres
+spiraAppManager.updateFormField("Description", "textValue", template);
+```
+
+**Signatures disponibles** :
+
+| Signature | Usage |
+|-----------|-------|
+| `updateFormField(fieldName, value)` | Champs texte simples |
+| `updateFormField(fieldName, dataProperty, value)` | **Recommande** pour RichText et tous les types |
+
+**dataProperty valides** : `"textValue"`, `"intValue"`, `"dateValue"`
+
+### 13.2 SpiraAppSettings Non Disponible au Chargement
+
+**Probleme** : Erreur `Uncaught ReferenceError: SpiraAppSettings is not defined` au chargement de la SpiraApp.
+
+**Cause** : Le code JavaScript s'execute avant que Spira ait initialise l'objet `SpiraAppSettings`.
+
+**Solution** : Attendre que `SpiraAppSettings` soit disponible avant d'initialiser.
+
+```javascript
+// ✅ Pattern robuste d'initialisation
+if (typeof SpiraAppSettings !== 'undefined') {
+    // SpiraAppSettings deja disponible
+    initMySpiraApp();
+} else {
+    // Attendre le chargement
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initMySpiraApp);
+    } else {
+        // DOM deja charge, petit delai pour laisser Spira initialiser
+        setTimeout(initMySpiraApp, 100);
+    }
+}
+
+function initMySpiraApp() {
+    // Re-verifier au cas ou
+    if (typeof SpiraAppSettings === 'undefined') {
+        console.error("[MyApp] SpiraAppSettings not available");
+        return;
+    }
+
+    var settings = SpiraAppSettings[APP_GUID];
+    if (!settings) {
+        console.warn("[MyApp] No settings configured");
+        return;
+    }
+
+    // Initialisation normale...
+}
+```
+
+### 13.3 spiraAppManager Non Accessible dans la Console F12
+
+**Probleme** : `spiraAppManager is not defined` quand on essaie de l'appeler depuis la console du navigateur.
+
+**Cause** : `spiraAppManager` est injecte dans le scope IIFE de la SpiraApp, pas dans le scope global.
+
+**Solution** : Exposer des fonctions de debug sur `window` pour le diagnostic.
+
+```javascript
+// Dans votre SpiraApp, exposer des helpers de debug
+window.MyApp_debug = function() {
+    console.log("Settings:", SpiraAppSettings[APP_GUID]);
+    console.log("ArtifactId:", spiraAppManager.artifactId);
+    console.log("ProjectId:", spiraAppManager.projectId);
+};
+
+window.MyApp_getField = function(fieldName) {
+    return spiraAppManager.getDataItemField(fieldName, "textValue");
+};
+
+window.MyApp_injectNow = function() {
+    // Votre fonction d'injection
+    injectTemplate();
+};
+```
+
+Depuis la console F12 :
+```javascript
+MyApp_debug()           // Voir l'etat
+MyApp_getField("Name")  // Lire un champ
+MyApp_injectNow()       // Forcer une action
+```
+
+### 13.4 updateFormField ne Persiste Pas les Donnees
+
+**Probleme** : `updateFormField` met a jour l'interface mais les donnees ne sont pas sauvegardees en base.
+
+**Cause** : `updateFormField` modifie uniquement le formulaire UI, pas la base de donnees.
+
+**Solution** : L'utilisateur doit cliquer sur "Save" ou appeler `saveForm()`.
+
+```javascript
+// Modifier le champ
+spiraAppManager.updateFormField("Description", "textValue", newContent);
+
+// Option 1: Informer l'utilisateur de sauvegarder
+spiraAppManager.displaySuccessMessage("Template injecte. Cliquez sur 'Save' pour enregistrer.");
+
+// Option 2: Sauvegarder automatiquement (declenche dataSaved apres succes)
+spiraAppManager.saveForm();
+```
+
+### 13.5 Template Non Injecte en Mode Creation
+
+**Probleme** : Le template ne s'injecte pas lors de la creation d'un nouvel artefact.
+
+**Cause** : En mode creation, `spiraAppManager.artifactId` est `null` ou `undefined`.
+
+**Solution** : Utiliser cette caracteristique pour detecter le mode.
+
+```javascript
+spiraAppManager.registerEvent_loaded(function() {
+    // Verifier si mode creation (pas d'ID)
+    if (!spiraAppManager.artifactId) {
+        console.log("Mode creation detecte");
+        injectDefaultTemplate();
+    } else {
+        console.log("Mode edition, ID:", spiraAppManager.artifactId);
+    }
+});
+```
+
+### 13.6 Evenement dropdownChanged Declenche Plusieurs Fois
+
+**Probleme** : Le handler `dropdownChanged` est appele plusieurs fois pour un seul changement.
+
+**Cause** : Certains dropdowns Spira peuvent declencher l'evenement plusieurs fois.
+
+**Solution** : Utiliser un flag pour eviter les traitements multiples.
+
+```javascript
+var isProcessing = false;
+
+spiraAppManager.registerEvent_dropdownChanged("RequirementTypeId", function(oldVal, newVal) {
+    if (isProcessing) return true;
+
+    isProcessing = true;
+    try {
+        // Votre logique ici
+        console.log("Type change de", oldVal, "a", newVal);
+    } finally {
+        // Reset apres un court delai
+        setTimeout(function() { isProcessing = false; }, 100);
+    }
+
+    return true; // Autoriser le changement
+});
+```
+
+### 13.7 Erreur "No manifest file found"
+
+**Probleme** : Le generateur de package affiche `Error: no manifest file found`.
+
+**Cause** : Le chemin vers le dossier source est incorrect ou ne contient pas `manifest.yaml`.
+
+**Solution** : Verifier le chemin et la presence du manifest.
+
+```bash
+# Verifier que le manifest existe
+ls "C:/chemin/vers/MaSpiraApp/manifest.yaml"
+
+# Utiliser npm run build avec les bons parametres
+npm run build --input="C:/chemin/vers/MaSpiraApp" --output="C:/chemin/output"
+
+# Note: les chemins doivent utiliser / ou \\ (pas \)
+```
+
+### 13.8 Le Bouton Menu Ne Declenche Pas le Handler
+
+**Probleme** : Le bouton apparait dans la toolbar mais le clic ne declenche rien.
+
+**Cause** : Le `name` dans le manifest ne correspond pas au `menuEntry` dans `registerEvent_menuEntryClick`.
+
+**Solution** : Verifier la correspondance exacte des noms.
+
+```yaml
+# manifest.yaml
+menus:
+  - pageId: 9
+    caption: "Mon Menu"
+    entries:
+      - name: "monAction"           # <-- Ce nom
+        caption: "Faire quelque chose"
+        actionTypeId: 2
+        action: "monAction"
+```
+
+```javascript
+// JavaScript - le deuxieme parametre doit correspondre au "name"
+spiraAppManager.registerEvent_menuEntryClick(
+    APP_GUID,      // ou RTI_GUID si vous l'avez defini
+    "monAction",   // <-- Doit correspondre au "name" ci-dessus
+    function() {
+        console.log("Bouton clique!");
+    }
+);
+```
+
+### 13.9 APP_GUID vs GUID Personnalise
+
+**Probleme** : `APP_GUID` est `undefined` dans certains contextes.
+
+**Cause** : `APP_GUID` est fourni par Spira mais peut ne pas etre disponible au moment de l'execution.
+
+**Solution** : Definir votre propre constante GUID comme fallback.
+
+```javascript
+// Definir le GUID en constante au debut du fichier
+var MY_APP_GUID = "b3f5a8d2-7c41-4e9a-b6d8-1f2e3a4b5c6d";
+
+// Utiliser avec fallback
+var guid = (typeof APP_GUID !== 'undefined') ? APP_GUID : MY_APP_GUID;
+
+// Pour les settings
+var settings = SpiraAppSettings[guid];
+```
+
+### 13.10 Resume des Signatures API Critiques
+
+| Methode | Signature Correcte | Notes |
+|---------|-------------------|-------|
+| `updateFormField` (RichText) | `updateFormField(fieldName, "textValue", value)` | 3 params pour RichText |
+| `getDataItemField` | `getDataItemField(fieldName, dataProperty)` | dataProperty obligatoire |
+| `registerEvent_menuEntryClick` | `registerEvent_menuEntryClick(appGuid, menuName, handler)` | 3 params |
+| `executeApi` | `executeApi(pluginName, apiVersion, method, url, body, successCb, errorCb)` | 7 params |
 
 ---
 
