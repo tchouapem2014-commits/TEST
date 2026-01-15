@@ -57,7 +57,19 @@
       "Bash(git init:*)",
       "Bash(git remote add:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(gh repo edit:*)",
+      "Bash(dir:*)",
+      "Bash(ls:*)",
+      "Bash(npm --prefix \"../spiraapp-package-generator\" run build --input=\"D:/RRRR/SpiraApps/RequirementTemplateInjector\" --output=\"D:/RRRR/SpiraApps/RequirementTemplateInjector\" --debug)",
+      "Bash(cmd /c \"cd /d d:\\\\RRRR\\\\SpiraApps\\\\spiraapp-package-generator && npm run build --input=d:\\\\RRRR\\\\SpiraApps\\\\SpiraXCapture --output=d:\\\\RRRR\\\\SpiraApps\\\\SpiraXCapture\")",
+      "Bash(cmd /c \"cd /d d:\\\\RRRR\\\\SpiraApps\\\\spiraapp-package-generator && node index.js\")",
+      "Bash(cmd /c \"set npm_config_input=d:\\\\RRRR\\\\SpiraApps\\\\SpiraXCapture&& set npm_config_output=d:\\\\RRRR\\\\SpiraApps\\\\SpiraXCapture&& cd /d d:\\\\RRRR\\\\SpiraApps\\\\spiraapp-package-generator && node index.js\")",
+      "Bash(cmd /c \"d:\\\\RRRR\\\\SpiraApps\\\\SpiraXCapture\\\\build.bat\")",
+      "Bash(find:*)"
     ]
   }
 }

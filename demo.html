@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo - RichText Toolbar Injector</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        .demo-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .demo-section h2 {
+            margin-top: 0;
+            color: #555;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        /* Simulation TinyMCE Toolbar */
+        .tox-tinymce {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .tox-toolbar {
+            background: #f0f0f0;
+            padding: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tox-toolbar__group {
+            display: flex;
+            gap: 2px;
+            padding: 0 4px;
+            border-right: 1px solid #ddd;
+        }
+        .tox-tbtn {
+            background: transparent;
+            border: none;
+            padding: 6px 10px;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        .tox-tbtn:hover { background: #e0e0e0; }
+        .tox-edit-area { padding: 0; }
+        .tox-edit-area [contenteditable] {
+            min-height: 150px;
+            padding: 12px;
+            outline: none;
+        }
+
+        /* Simulation Quill Toolbar */
+        .ql-container {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .ql-toolbar {
+            background: #fafafa;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            gap: 8px;
+        }
+        .ql-formats {
+            display: flex;
+            gap: 4px;
+        }
+        .ql-toolbar button {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .ql-toolbar button:hover { background: #f0f0f0; }
+        .ql-editor {
+            min-height: 150px;
+            padding: 12px;
+            outline: none;
+        }
+
+        /* Simulation CKEditor Toolbar */
+        .cke-container {
+            border: 1px solid #d1d1d1;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .cke_top {
+            background: linear-gradient(to bottom, #fff, #e6e6e6);
+            padding: 6px;
+            border-bottom: 1px solid #b6b6b6;
+        }
+        .cke_toolbox {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .cke_toolbar {
+            display: flex;
+            padding: 2px 4px;
+        }
+        .cke_toolgroup {
+            display: flex;
+            margin-right: 6px;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .cke_button {
+            background: #e4e4e4;
+            border: 1px solid #bcbcbc;
+            padding: 4px 6px;
+            cursor: pointer;
+            color: #333;
+            text-decoration: none;
+            font-size: 12px;
+        }
+        .cke_button:hover { background: #ccc; }
+        .cke_wysiwyg {
+            min-height: 150px;
+            padding: 12px;
+            outline: none;
+        }
+
+        /* Simulation Generic Toolbar */
+        .generic-editor {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .editor-toolbar {
+            background: #fafafa;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            gap: 4px;
+        }
+        .editor-toolbar button {
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 6px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .editor-toolbar button:hover { background: #f0f0f0; }
+        .editor-content {
+            min-height: 150px;
+            padding: 12px;
+            outline: none;
+        }
+
+        /* Info box */
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 12px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .info-box code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        /* Console output */
+        #console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        #console-output .log { color: #9cdcfe; }
+        #console-output .info { color: #4ec9b0; }
+        #console-output .warn { color: #dcdcaa; }
+    </style>
+</head>
+<body>
+    <h1>Demo - RichText Toolbar Injector</h1>
+
+    <div class="info-box">
+        <strong>Instructions:</strong> Cette page simule différents éditeurs RichText.
+        Regardez comment le bouton <code>Custom</code> est automatiquement injecté dans chaque toolbar.
+        Cliquez sur le bouton pour voir l'interaction avec l'éditeur.
+    </div>
+
+    <!-- TinyMCE Simulation -->
+    <div class="demo-section">
+        <h2>1. Simulation TinyMCE</h2>
+        <div class="tox-tinymce">
+            <div class="tox-toolbar" role="toolbar">
+                <div class="tox-toolbar__group">
+                    <button class="tox-tbtn" title="Gras"><b>B</b></button>
+                    <button class="tox-tbtn" title="Italique"><i>I</i></button>
+                    <button class="tox-tbtn" title="Souligné"><u>U</u></button>
+                </div>
+                <div class="tox-toolbar__group">
+                    <button class="tox-tbtn" title="Liste">☰</button>
+                    <button class="tox-tbtn" title="Lien">🔗</button>
+                </div>
+            </div>
+            <div class="tox-edit-area">
+                <div contenteditable="true" class="mce-content-body">
+                    <p>Ceci est un éditeur simulant <strong>TinyMCE</strong>. Sélectionnez du texte et cliquez sur le bouton injecté.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quill Simulation -->
+    <div class="demo-section">
+        <h2>2. Simulation Quill</h2>
+        <div class="ql-container">
+            <div class="ql-toolbar" role="toolbar">
+                <span class="ql-formats">
+                    <button class="ql-bold" title="Gras">B</button>
+                    <button class="ql-italic" title="Italique">I</button>
+                </span>
+                <span class="ql-formats">
+                    <button class="ql-link" title="Lien">🔗</button>
+                    <button class="ql-image" title="Image">🖼</button>
+                </span>
+            </div>
+            <div class="ql-editor" contenteditable="true">
+                <p>Ceci est un éditeur simulant <strong>Quill</strong>. Le bouton personnalisé devrait apparaître dans la toolbar.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- CKEditor Simulation -->
+    <div class="demo-section">
+        <h2>3. Simulation CKEditor</h2>
+        <div class="cke-container">
+            <div class="cke_top">
+                <div class="cke_toolbox">
+                    <div class="cke_toolbar">
+                        <span class="cke_toolgroup">
+                            <a class="cke_button" title="Gras" role="button">Gras</a>
+                            <a class="cke_button" title="Italique" role="button">Italique</a>
+                        </span>
+                    </div>
+                    <div class="cke_toolbar">
+                        <span class="cke_toolgroup">
+                            <a class="cke_button" title="Lien" role="button">Lien</a>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="cke_wysiwyg" contenteditable="true">
+                <p>Ceci est un éditeur simulant <strong>CKEditor</strong>. Testez l'injection du bouton ici.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Editor -->
+    <div class="demo-section">
+        <h2>4. Éditeur Générique</h2>
+        <div class="generic-editor">
+            <div class="editor-toolbar" role="toolbar">
+                <button title="Gras">Gras</button>
+                <button title="Italique">Italique</button>
+                <button title="Lien">Lien</button>
+            </div>
+            <div class="editor-content" contenteditable="true">
+                <p>Ceci est un éditeur générique. L'injecteur devrait détecter la toolbar via les sélecteurs génériques.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dynamic Editor (créé après chargement) -->
+    <div class="demo-section">
+        <h2>5. Éditeur Dynamique (créé après 2 secondes)</h2>
+        <div id="dynamic-container">
+            <p><em>L'éditeur sera créé dynamiquement dans 2 secondes... Le MutationObserver devrait le détecter.</em></p>
+        </div>
+    </div>
+
+    <!-- Console Output -->
+    <div class="demo-section">
+        <h2>Console de Debug</h2>
+        <div id="console-output"></div>
+    </div>
+
+    <!-- Charger l'injecteur -->
+    <script src="richtext-toolbar-injector.js"></script>
+    <script>
+        // Override console.log pour afficher dans la page
+        const consoleOutput = document.getElementById('console-output');
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
+            consoleOutput.innerHTML += `<div class="log">${new Date().toLocaleTimeString()} - ${message}</div>`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        };
+
+        // Initialiser l'injecteur
+        const injector = new RichTextToolbarInjector({
+            buttonText: '✨ Custom',
+            buttonTitle: 'Mon bouton personnalisé injecté',
+            debug: true,
+            onClick: (ctx) => {
+                const selection = ctx.getSelection();
+                console.log(`Bouton cliqué! Type: ${ctx.editorType}, Sélection: "${selection || '(vide)'}"`);
+
+                if (selection) {
+                    // Mettre le texte sélectionné en surbrillance
+                    ctx.insertContent(`<mark style="background: yellow;">${selection}</mark>`);
+                    console.log('Texte surligné avec succès!');
+                } else {
+                    // Insérer du texte
+                    ctx.insertContent('<span style="color: blue;">[Texte inséré par le bouton custom]</span>');
+                    console.log('Texte inséré!');
+                }
+            }
+        });
+
+        // Créer un éditeur dynamiquement après 2 secondes
+        setTimeout(() => {
+            const container = document.getElementById('dynamic-container');
+            container.innerHTML = `
+                <div class="generic-editor">
+                    <div class="editor-toolbar" role="toolbar">
+                        <button title="Gras">B</button>
+                        <button title="Italique">I</button>
+                    </div>
+                    <div class="editor-content" contenteditable="true">
+                        <p>🎉 Cet éditeur a été créé <strong>dynamiquement</strong>! Le MutationObserver l'a détecté et le bouton a été injecté automatiquement.</p>
+                    </div>
+                </div>
+            `;
+            console.log('Éditeur dynamique créé - MutationObserver devrait le détecter...');
+        }, 2000);
+
+        console.log('Page de démonstration chargée. Injecteur initialisé.');
+    </script>
+</body>
+</html>
