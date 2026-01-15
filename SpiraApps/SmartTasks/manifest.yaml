@@ -1,0 +1,159 @@
+# ============================================================
+# SMARTTASKS (ST)
+# SpiraApp Manifest - Version 1.0.0
+# ============================================================
+# Gestion intelligente des dependances de taches avec calcul
+# automatique des dates - Inspire de Helix Plan
+# ============================================================
+
+guid: c7e9f3a1-5b28-4d6c-9e1f-8a2b3c4d5e6f
+name: SmartTasks
+caption: Smart Tasks
+summary: Gestion des dependances avec calcul automatique des dates
+description: >-
+  SmartTasks permet de gerer les dependances entre taches avec calcul automatique
+  des dates de debut et de fin. Inspire de Helix Plan, il offre une visualisation
+  des chaines de dependances, la propagation automatique des modifications de dates,
+  et l'analyse d'impact sur les taches liees. Supporte les liens Finish-to-Start,
+  Start-to-Start, Finish-to-Finish et Start-to-Finish avec delai (lag) configurable.
+productSummary: Dependances de taches avec calcul automatique des dates
+productDescription: >-
+  Gestion avancee des dependances entre taches. Calcul automatique des dates lors
+  de la modification d'une tache predecesseur. Visualisation de la chaine de
+  dependances. Analyse d'impact sur les taches successeurs. Configuration des
+  types de liens et delais par defaut.
+version: 1.0
+author: SpiraApps Developer
+license: MIT
+copyright: Copyright 2026
+url: https://github.com/spiraapps/smarttasks
+
+# ============================================================
+# PRODUCT SETTINGS - Configuration
+# ============================================================
+# settingTypeId: 1=String, 2=RichText, 10=Boolean
+
+productSettings:
+
+  # ══════════════════════════════════════════════════════════════
+  # CALCUL AUTOMATIQUE
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 10
+    name: auto_calculate
+    caption: Calcul automatique des dates
+    position: 1
+    tooltip: >-
+      Active le recalcul automatique des dates des taches successeurs
+      lorsqu'une tache predecesseur est modifiee.
+
+  # ══════════════════════════════════════════════════════════════
+  # TYPE DE LIEN PAR DEFAUT
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 1
+    name: default_link_type
+    caption: Type de lien par defaut
+    position: 2
+    placeholder: "FS"
+    tooltip: >-
+      Type de dependance par defaut: FS (Finish-to-Start), SS (Start-to-Start),
+      FF (Finish-to-Finish), SF (Start-to-Finish). Defaut: FS.
+
+  # ══════════════════════════════════════════════════════════════
+  # LAG PAR DEFAUT
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 1
+    name: default_lag
+    caption: Delai par defaut (jours)
+    position: 3
+    placeholder: "0"
+    tooltip: >-
+      Delai en jours entre la fin du predecesseur et le debut du successeur.
+      Peut etre negatif pour un chevauchement. Defaut: 0.
+
+  # ══════════════════════════════════════════════════════════════
+  # PROPAGATION EN CASCADE
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 10
+    name: cascade_propagation
+    caption: Propagation en cascade
+    position: 4
+    tooltip: >-
+      Propage automatiquement les modifications de dates a toute la chaine
+      de dependances (successeurs des successeurs, etc.).
+
+  # ══════════════════════════════════════════════════════════════
+  # RESPECTER WEEK-ENDS
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 10
+    name: skip_weekends
+    caption: Ignorer les week-ends
+    position: 5
+    tooltip: >-
+      Exclut les samedis et dimanches du calcul des dates.
+      Les taches ne commenceront pas un week-end.
+
+  # ══════════════════════════════════════════════════════════════
+  # MODE DEBUG
+  # ══════════════════════════════════════════════════════════════
+  - settingTypeId: 10
+    name: debug_mode
+    caption: Mode debug
+    position: 10
+    tooltip: Affiche les logs dans la console navigateur (F12)
+
+# ============================================================
+# PAGE CONTENTS - Injection du script sur TaskDetails
+# ============================================================
+
+pageContents:
+  # TaskDetails (pageId: 14)
+  - pageId: 14
+    name: smarttasks
+    code: "file://smarttasks.js"
+
+# ============================================================
+# MENUS - Boutons d'action dans la toolbar TaskDetails
+# ============================================================
+
+menus:
+  # TaskDetails
+  - pageId: 14
+    caption: SmartTasks
+    icon: fa-solid fa-link
+    isActive: true
+    entries:
+      # Ajouter une dependance
+      - name: addDependency
+        caption: Ajouter Dependance
+        tooltip: Ajoute une dependance avec une autre tache
+        icon: fa-solid fa-plus
+        isActive: true
+        actionTypeId: 2
+        action: addDependency
+
+      # Voir les dependances
+      - name: viewDependencies
+        caption: Voir Dependances
+        tooltip: Affiche la liste des dependances de cette tache
+        icon: fa-solid fa-project-diagram
+        isActive: true
+        actionTypeId: 2
+        action: viewDependencies
+
+      # Recalculer les dates
+      - name: recalculateDates
+        caption: Recalculer Dates
+        tooltip: Recalcule les dates en fonction des dependances
+        icon: fa-solid fa-calculator
+        isActive: true
+        actionTypeId: 2
+        action: recalculateDates
+
+      # Analyser la chaine de dependances
+      - name: analyzeChain
+        caption: Analyser Chaine
+        tooltip: Analyse la chaine complete de dependances et l'impact
+        icon: fa-solid fa-sitemap
+        isActive: true
+        actionTypeId: 2
+        action: analyzeChain

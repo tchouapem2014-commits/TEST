@@ -1256,7 +1256,7 @@ if (SpiraAppSettings[APP_GUID]) {
 ## 9. Empaquetage et Deploiement
 
 ### Prerequis
-- Node.js installe
+- Node.js installe (v16+)
 - Git installe
 - Compte GitHub (pour la soumission officielle)
 
@@ -1268,26 +1268,73 @@ if (SpiraAppSettings[APP_GUID]) {
 4. Creer les templates HTML si necessaire
 5. Ajouter les styles CSS si necessaire
 
-### Etape 2: Tester Localement
+### Etape 2: Installation du Generateur de Package
 
-1. **Activer le mode developpeur** :
-   - System Administration > General Settings
-   - Cocher "Enable Developer Mode"
+Le generateur officiel Inflectra convertit votre SpiraApp en fichier `.spiraapp` valide.
 
-2. **Builder la SpiraApp** :
 ```bash
 # Cloner le generateur de package
 git clone https://github.com/Inflectra/spiraapp-package-generator
 cd spiraapp-package-generator
 
-# Installer les dependances
+# Installer les dependances (une seule fois)
 npm install
-
-# Builder la SpiraApp
-npm run build --input="C:/chemin/vers/MaSpiraApp" --output="C:/chemin/vers/output"
 ```
 
-Cela genere un fichier `MaSpiraApp.spiraapp`.
+### Etape 3: Generer le Package .spiraapp
+
+**Syntaxe de la commande:**
+```bash
+npm run build --input="CHEMIN_VERS_SPIRAAPP" --output="CHEMIN_SORTIE"
+```
+
+**Parametres:**
+| Parametre | Description | Obligatoire |
+|-----------|-------------|-------------|
+| `--input` | Chemin absolu vers le dossier contenant `manifest.yaml` | Oui |
+| `--output` | Chemin absolu vers le dossier de sortie du `.spiraapp` | Oui |
+| `--debug` | Mode debug - ne minifie pas le JavaScript | Non |
+
+**Exemples concrets:**
+
+```bash
+# Windows - Build standard (JavaScript minifie)
+npm run build --input="C:\SpiraApps\SmartTasks" --output="C:\SpiraApps\SmartTasks"
+
+# Windows - Build debug (JavaScript non minifie, pour debogage)
+npm run build --input="C:\SpiraApps\SmartTasks" --output="C:\SpiraApps\SmartTasks" --debug
+
+# Linux/Mac
+npm run build --input="/home/user/SpiraApps/SmartTasks" --output="/home/user/SpiraApps/SmartTasks"
+```
+
+**Resultat:**
+- Le fichier genere est nomme automatiquement d'apres le GUID du manifest
+- Format: `{guid}.spiraapp` (ex: `c7e9f3a1-5b28-4d6c-9e1f-8a2b3c4d5e6f.spiraapp`)
+- Le generateur valide le manifest et affiche les erreurs eventuelles
+
+**Exemple de sortie reussie:**
+```
+package has started
+Successfully created "SmartTasks" bundle - saved to C:\SpiraApps\SmartTasks/c7e9f3a1-5b28-4d6c-9e1f-8a2b3c4d5e6f.spiraapp
+```
+
+**Erreurs courantes:**
+| Erreur | Cause | Solution |
+|--------|-------|----------|
+| `no manifest file found` | Chemin incorrect ou manifest.yaml absent | Verifier le chemin --input |
+| `Error in manifest` | Manifest invalide | Corriger les erreurs indiquees |
+| `file not found: file://xxx.js` | Fichier JS reference mais absent | Creer le fichier ou corriger la reference |
+
+### Etape 4: Activer le Mode Developpeur (Optionnel)
+
+Pour tester sans passer par le marketplace:
+
+1. **Activer le mode developpeur** :
+   - System Administration > General Settings
+   - Cocher "Enable Developer Mode"
+
+2. Cela permet d'uploader des fichiers `.spiraapp` directement
 
 ### Etape 3: Installer pour Test
 
