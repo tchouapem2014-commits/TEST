@@ -1,0 +1,189 @@
+# ============================================================
+# SPIRAXCAPTURE (SXC)
+# SpiraApp Manifest - Version 2.0.0
+# ============================================================
+# Capture d'ecran avec injection dans toolbar RichText
+# Reproduction du comportement Helix ALM Web
+# ============================================================
+
+guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+name: SpiraXCapture
+caption: SpiraX Capture
+summary: Capture screenshots and insert directly into RichText fields
+description: >-
+  SpiraXCapture reproduces Helix ALM Web screenshot behavior. It injects a capture
+  button directly into every RichText editor toolbar. Captured images can be edited
+  (crop, arrows, shapes, text) before being inserted inline into the Description field.
+productSummary: Capture, edit and insert screenshots into RichText
+productDescription: >-
+  Screenshot capture with built-in image editor. Injects capture button into
+  RichText toolbars. Edit screenshots before insertion (crop, draw, arrows, text).
+version: 2.0
+author: SpiraApps Developer
+license: MIT
+copyright: Copyright 2026
+url: https://github.com/spiraapps/spiraxcapture
+
+# ============================================================
+# PRODUCT SETTINGS
+# ============================================================
+
+productSettings:
+
+  # Qualite de capture (pour JPEG)
+  - settingTypeId: 1
+    name: capture_quality
+    caption: Qualite capture (0.1-1.0)
+    position: 1
+    placeholder: "0.8"
+    tooltip: >-
+      Qualite de compression pour les captures JPEG (0.1 = basse, 1.0 = maximale).
+      Ignore pour le format PNG.
+
+  # Format de capture
+  - settingTypeId: 1
+    name: capture_format
+    caption: Format (png/jpeg)
+    position: 2
+    placeholder: "png"
+    tooltip: >-
+      Format de l'image capturee. PNG pour qualite maximale, JPEG pour taille reduite.
+
+  # Timestamp automatique
+  - settingTypeId: 10
+    name: auto_timestamp
+    caption: Ajouter timestamp au nom
+    position: 3
+    tooltip: >-
+      Ajoute automatiquement la date et l'heure au nom du fichier capture.
+
+  # Mode debug
+  - settingTypeId: 10
+    name: debug_mode
+    caption: Mode debug
+    position: 4
+    tooltip: Affiche les logs dans la console navigateur (F12)
+
+# ============================================================
+# PAGE CONTENTS - Inject script on detail pages
+# ============================================================
+
+pageContents:
+  # RequirementDetails
+  - pageId: 9
+    name: capture
+    code: "file://capture.js"
+
+  # TestCaseDetails
+  - pageId: 10
+    name: capture
+    code: "file://capture.js"
+
+  # TestSetDetails
+  - pageId: 11
+    name: capture
+    code: "file://capture.js"
+
+  # IncidentDetails (Bugs)
+  - pageId: 14
+    name: capture
+    code: "file://capture.js"
+
+  # TaskDetails
+  - pageId: 15
+    name: capture
+    code: "file://capture.js"
+
+  # ReleaseDetails
+  - pageId: 16
+    name: capture
+    code: "file://capture.js"
+
+# ============================================================
+# MENUS - Bouton capture dans toolbar
+# ============================================================
+
+menus:
+  # RequirementDetails
+  - pageId: 9
+    caption: SXC
+    icon: fa-solid fa-camera
+    isActive: true
+    entries:
+      - name: captureScreen
+        caption: Capturer Ecran
+        tooltip: Capture l'ecran et l'attache a l'exigence
+        icon: fa-solid fa-camera-retro
+        isActive: true
+        actionTypeId: 2
+        action: captureScreen
+
+  # TestCaseDetails
+  - pageId: 10
+    caption: SXC
+    icon: fa-solid fa-camera
+    isActive: true
+    entries:
+      - name: captureScreen
+        caption: Capturer Ecran
+        tooltip: Capture l'ecran et l'attache au cas de test
+        icon: fa-solid fa-camera-retro
+        isActive: true
+        actionTypeId: 2
+        action: captureScreen
+
+  # TestSetDetails
+  - pageId: 11
+    caption: SXC
+    icon: fa-solid fa-camera
+    isActive: true
+    entries:
+      - name: captureScreen
+        caption: Capturer Ecran
+        tooltip: Capture l'ecran et l'attache au jeu de test
+        icon: fa-solid fa-camera-retro
+        isActive: true
+        actionTypeId: 2
+        action: captureScreen
+
+  # IncidentDetails
+  - pageId: 14
+    caption: SXC
+    icon: fa-solid fa-camera
+    isActive: true
+    entries:
+      - name: captureScreen
+        caption: Capturer Ecran
+        tooltip: Capture l'ecran et l'attache a l'incident
+        icon: fa-solid fa-camera-retro
+        isActive: true
+        actionTypeId: 2
+        action: captureScreen
+
+  # TaskDetails
+  - pageId: 15
+    caption: SXC
+    icon: fa-solid fa-camera
+    isActive: true
+    entries:
+      - name: captureScreen
+        caption: Capturer Ecran
+        tooltip: Capture l'ecran et l'attache a la tache
+        icon: fa-solid fa-camera-retro
+        isActive: true
+        actionTypeId: 2
+        action: captureScreen
+
+  # ReleaseDetails
+  - pageId: 16
+    caption: SXC
+    icon: fa-solid fa-camera
+    isActive: true
+    entries:
+      - name: captureScreen
+        caption: Capturer Ecran
+        tooltip: Capture l'ecran et l'attache a la release
+        icon: fa-solid fa-camera-retro
+        isActive: true
+        actionTypeId: 2
+        action: captureScreen
