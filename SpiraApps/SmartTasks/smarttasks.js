@@ -731,7 +731,8 @@
      */
     function getProjectTasks(callback) {
         // L'API Spira requiert des parametres de pagination
-        var url = "projects/" + stState.currentProjectId + "/tasks?start_row=1&number_of_rows=500";
+        // Note: starting_row est 0-based, number_of_rows = max resultats
+        var url = "projects/" + stState.currentProjectId + "/tasks?starting_row=0&number_of_rows=500";
 
         log("DEBUG", "Fetching tasks from:", url);
 
