@@ -2002,4 +2002,623 @@ var settings = SpiraAppSettings[guid];
 
 ---
 
+## 14. Reference Complete API REST Spira v7.0
+
+Cette section documente les endpoints REST API Spira pour une utilisation avec `spiraAppManager.executeApi()`.
+
+### 14.1 URL de Base et Authentification
+
+**URL de Base:**
+```
+https://{instance}.spiraservice.net/Services/v7_0/RestService.svc/
+```
+
+**Authentification via SpiraApps:**
+```javascript
+// L'authentification est geree automatiquement par executeApi
+spiraAppManager.executeApi(
+    "MaSpiraApp",    // pluginName
+    "7.0",           // apiVersion
+    "GET",           // method
+    "projects/1/tasks/42",  // url relative
+    null,            // body
+    successCallback,
+    errorCallback
+);
+```
+
+**Authentification directe (hors SpiraApp):**
+```
+Headers:
+  username: {votre_username}
+  api-key: {votre_api_key}  // Format: {00000000-0000-0000-0000-000000000000}
+  Content-Type: application/json
+  Accept: application/json
+```
+
+### 14.2 ArtifactTypeId - Table de Reference
+
+| Artifact | ID | Utilisation |
+|----------|-----|-------------|
+| Requirement | 1 | Exigences |
+| TestCase | 2 | Cas de test |
+| Incident | 3 | Bugs/Defauts |
+| Release | 4 | Versions/Iterations |
+| TestRun | 5 | Executions de test |
+| Task | 6 | Taches |
+| TestStep | 7 | Etapes de test |
+| TestSet | 8 | Jeux de tests |
+| AutomationHost | 9 | Hotes d'automatisation |
+| AutomationEngine | 10 | Moteurs d'automatisation |
+| RequirementStep | 12 | Etapes d'exigence |
+| Document | 13 | Documents/Pieces jointes |
+| Risk | 14 | Risques |
+| RiskMitigation | 15 | Mitigations de risque |
+
+### 14.3 Pagination et Filtrage
+
+**Parametres de Pagination (Query String):**
+```
+?starting_row=0&number_of_rows=100&sort_field=Name&sort_direction=ASC
+```
+
+| Parametre | Description |
+|-----------|-------------|
+| `starting_row` | Index de depart (0-based) |
+| `number_of_rows` | Nombre max de resultats |
+| `sort_field` | Champ de tri (ex: "Name", "TaskId", "StartDate") |
+| `sort_direction` | "ASC" ou "DESC" |
+
+**Format de Filtre (POST Body):**
+```json
+[
+  {"PropertyName": "Name", "StringValue": "login"},
+  {"PropertyName": "TaskStatusId", "IntValue": 2},
+  {"PropertyName": "OwnerId", "MultiValue": [1, 2, 3]},
+  {"PropertyName": "StartDate", "DateRangeValue": {
+    "StartDate": "2024-01-01T00:00:00Z",
+    "EndDate": "2024-12-31T23:59:59Z"
+  }}
+]
+```
+
+### 14.4 API TASKS (Taches)
+
+#### Lister les Taches
+```javascript
+// GET avec pagination
+spiraAppManager.executeApi(
+    "SmartTasks", "7.0", "GET",
+    "projects/" + projectId + "/tasks?starting_row=0&number_of_rows=500",
+    null,
+    function(tasks) { console.log(tasks); },
+    function(error) { console.error(error); }
+);
+```
+
+#### Recuperer une Tache
+```javascript
+spiraAppManager.executeApi(
+    "SmartTasks", "7.0", "GET",
+    "projects/" + projectId + "/tasks/" + taskId,
+    null,
+    successCallback, errorCallback
+);
+```
+
+#### Creer une Tache
+```javascript
+var newTask = {
+    Name: "Nouvelle tache",
+    Description: "Description de la tache",
+    TaskStatusId: 1,           // Requis
+    TaskTypeId: 1,
+    TaskPriorityId: 2,
+    OwnerId: 5,
+    StartDate: "2024-01-15T00:00:00",
+    EndDate: "2024-01-20T00:00:00",
+    EstimatedEffort: 480,      // En minutes (480 = 8h)
+    ReleaseId: 5,
+    RequirementId: 10
+};
+
+spiraAppManager.executeApi(
+    "SmartTasks", "7.0", "POST",
+    "projects/" + projectId + "/tasks",
+    newTask,
+    successCallback, errorCallback
+);
+```
+
+#### Mettre a Jour une Tache
+```javascript
+// IMPORTANT: Recuperer d'abord ConcurrencyDate via GET
+var updateTask = {
+    TaskId: 42,
+    Name: "Tache modifiee",
+    TaskStatusId: 3,
+    ActualEffort: 520,
+    ConcurrencyDate: "2024-01-15T14:20:00"  // Requis!
+};
+
+spiraAppManager.executeApi(
+    "SmartTasks", "7.0", "PUT",
+    "projects/" + projectId + "/tasks",  // Sans taskId dans l'URL
+    updateTask,
+    successCallback, errorCallback
+);
+```
+
+#### Supprimer une Tache
+```javascript
+spiraAppManager.executeApi(
+    "SmartTasks", "7.0", "DELETE",
+    "projects/" + projectId + "/tasks/" + taskId,
+    null,
+    successCallback, errorCallback
+);
+```
+
+#### Rechercher avec Filtres
+```javascript
+var filters = [
+    {"PropertyName": "TaskStatusId", "IntValue": 2},
+    {"PropertyName": "OwnerId", "IntValue": 5}
+];
+
+spiraAppManager.executeApi(
+    "SmartTasks", "7.0", "POST",
+    "projects/" + projectId + "/tasks?starting_row=0&number_of_rows=100",
+    filters,
+    successCallback, errorCallback
+);
+```
+
+### 14.5 API REQUIREMENTS (Exigences)
+
+#### Lister les Exigences
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "projects/" + projectId + "/requirements?starting_row=0&number_of_rows=500",
+    null, successCallback, errorCallback
+);
+```
+
+#### Recuperer une Exigence
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "projects/" + projectId + "/requirements/" + requirementId,
+    null, successCallback, errorCallback
+);
+```
+
+#### Creer une Exigence (racine)
+```javascript
+var newReq = {
+    Name: "Nouvelle exigence",
+    Description: "Description detaillee",
+    RequirementStatusId: 1,
+    RequirementTypeId: 2,
+    ImportanceId: 2,
+    OwnerId: 5,
+    ReleaseId: 3
+};
+
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/requirements",
+    newReq, successCallback, errorCallback
+);
+```
+
+#### Creer sous un Parent
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/requirements/parent/" + parentId,
+    newReq, successCallback, errorCallback
+);
+```
+
+#### Recuperer les Enfants
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "projects/" + projectId + "/requirements/" + requirementId + "/children",
+    null, successCallback, errorCallback
+);
+```
+
+#### Deplacer/Indenter
+```javascript
+// Indenter
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/requirements/" + reqId + "/indent",
+    null, successCallback, errorCallback
+);
+
+// Outdenter
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/requirements/" + reqId + "/outdent",
+    null, successCallback, errorCallback
+);
+
+// Deplacer
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/requirements/" + reqId + "/move?destination_requirement_id=" + destId,
+    null, successCallback, errorCallback
+);
+```
+
+### 14.6 API INCIDENTS (Bugs)
+
+#### Lister les Incidents
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "projects/" + projectId + "/incidents?starting_row=0&number_of_rows=100",
+    null, successCallback, errorCallback
+);
+```
+
+#### Creer un Incident
+```javascript
+var newIncident = {
+    Name: "Bug: Erreur de connexion",
+    Description: "L'utilisateur ne peut pas se connecter",
+    IncidentStatusId: 1,       // Requis
+    IncidentTypeId: 1,         // Requis
+    IncidentPriorityId: 2,
+    IncidentSeverityId: 2,
+    OwnerId: 5,
+    DetectedReleaseId: 3,
+    ResolvedReleaseId: null
+};
+
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/incidents",
+    newIncident, successCallback, errorCallback
+);
+```
+
+#### Mettre a Jour un Incident
+```javascript
+var updateIncident = {
+    IncidentId: 123,
+    Name: "Bug corrige",
+    IncidentStatusId: 3,
+    ConcurrencyDate: "2024-01-15T14:20:00"
+};
+
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "PUT",
+    "projects/" + projectId + "/incidents/" + incidentId,
+    updateIncident, successCallback, errorCallback
+);
+```
+
+#### Ajouter un Commentaire
+```javascript
+var comment = {
+    Text: "Ce bug est en cours d'investigation."
+};
+
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/incidents/" + incidentId + "/comments",
+    comment, successCallback, errorCallback
+);
+```
+
+### 14.7 API RELEASES (Versions)
+
+#### Lister les Releases
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "projects/" + projectId + "/releases?active_only=true",
+    null, successCallback, errorCallback
+);
+```
+
+#### Creer une Release
+```javascript
+var newRelease = {
+    Name: "Version 2.0",
+    Description: "Nouvelle version majeure",
+    VersionNumber: "2.0.0.0",
+    StartDate: "2024-02-01T00:00:00",
+    EndDate: "2024-06-30T00:00:00",
+    ResourceCount: 5,
+    DaysNonWorking: 0
+};
+
+// Release racine
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/releases",
+    newRelease, successCallback, errorCallback
+);
+
+// Release enfant (iteration)
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/releases/" + parentReleaseId,
+    newRelease, successCallback, errorCallback
+);
+```
+
+### 14.8 API TEST CASES (Cas de Test)
+
+#### Lister les Test Cases
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "projects/" + projectId + "/test-cases?starting_row=0&number_of_rows=100",
+    null, successCallback, errorCallback
+);
+```
+
+#### Creer un Test Case
+```javascript
+var newTestCase = {
+    Name: "Test de connexion utilisateur",
+    Description: "Verifie que l'utilisateur peut se connecter",
+    TestCaseStatusId: 1,       // Requis
+    TestCaseTypeId: 2,         // Requis
+    TestCasePriorityId: 2,
+    OwnerId: 5,
+    EstimatedDuration: 15      // En minutes
+};
+
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/test-cases",
+    newTestCase, successCallback, errorCallback
+);
+```
+
+#### Ajouter des Test Steps
+```javascript
+var newStep = {
+    Description: "Entrer le nom d'utilisateur",
+    ExpectedResult: "Le champ accepte la saisie",
+    SampleData: "testuser@example.com",
+    Position: 1
+};
+
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/test-cases/" + testCaseId + "/test-steps",
+    newStep, successCallback, errorCallback
+);
+```
+
+#### Recuperer les Test Steps
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "projects/" + projectId + "/test-cases/" + testCaseId + "/test-steps",
+    null, successCallback, errorCallback
+);
+```
+
+### 14.9 API TEST RUNS (Executions)
+
+#### Creer un Test Run Manuel
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/test-runs/create?test_case_id=" + testCaseId + "&release_id=" + releaseId,
+    null, successCallback, errorCallback
+);
+```
+
+#### Enregistrer un Test Run Automatise
+```javascript
+var testRunResult = {
+    TestCaseId: 123,
+    ReleaseId: 5,
+    ExecutionStatusId: 2,      // 2 = Passed
+    StartDate: "2024-01-15T10:00:00",
+    EndDate: "2024-01-15T10:05:00",
+    RunnerName: "Automation Suite",
+    RunnerTestName: "LoginTest",
+    RunnerMessage: "Test passed successfully",
+    RunnerStackTrace: null
+};
+
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/test-runs/record",
+    testRunResult, successCallback, errorCallback
+);
+```
+
+**ExecutionStatusId:**
+| ID | Statut |
+|----|--------|
+| 1 | Failed |
+| 2 | Passed |
+| 3 | Not Run |
+| 4 | Not Applicable |
+| 5 | Blocked |
+| 6 | Caution |
+
+### 14.10 API ASSOCIATIONS (Liens entre Artefacts)
+
+#### Creer une Association
+```javascript
+var association = {
+    ArtifactTypeId: 1,           // Requirement
+    ArtifactId: 10,
+    LinkedArtifactTypeId: 6,     // Task
+    LinkedArtifactId: 42,
+    LinkTypeId: 1,
+    LinkDescription: "Implementation de l'exigence"
+};
+
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/associations",
+    association, successCallback, errorCallback
+);
+```
+
+#### Recuperer les Associations
+```javascript
+// Associations d'une exigence (artifact_type_id=1)
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "projects/" + projectId + "/associations/1/" + requirementId,
+    null, successCallback, errorCallback
+);
+```
+
+#### Supprimer une Association
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "DELETE",
+    "projects/" + projectId + "/associations/" + associationId,
+    null, successCallback, errorCallback
+);
+```
+
+### 14.11 API DOCUMENTS (Pieces Jointes)
+
+#### Lister les Documents
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "projects/" + projectId + "/documents",
+    null, successCallback, errorCallback
+);
+```
+
+#### Telecharger un Document
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "projects/" + projectId + "/documents/" + documentId + "/open",
+    null,
+    function(data) {
+        // data contient le contenu binaire encode
+    },
+    errorCallback
+);
+```
+
+#### Attacher un Document a un Artefact
+```javascript
+// Attacher doc 100 a l'incident 50 (artifact_type_id=3)
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/artifact-types/3/artifacts/50/documents/100",
+    null, successCallback, errorCallback
+);
+```
+
+### 14.12 API USERS (Utilisateurs)
+
+#### Utilisateur Courant
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "users",
+    null, successCallback, errorCallback
+);
+```
+
+#### Lister les Utilisateurs du Projet
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "projects/" + projectId + "/users",
+    null, successCallback, errorCallback
+);
+```
+
+### 14.13 API COMMENTAIRES (Generique)
+
+Les commentaires suivent le meme pattern pour tous les artefacts:
+
+```javascript
+// GET commentaires
+"projects/{pid}/requirements/{id}/comments"
+"projects/{pid}/tasks/{id}/comments"
+"projects/{pid}/incidents/{id}/comments"
+"projects/{pid}/releases/{id}/comments"
+"projects/{pid}/test-cases/{id}/comments"
+"projects/{pid}/risks/{id}/comments"
+
+// POST commentaire
+var comment = { Text: "Mon commentaire" };
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "POST",
+    "projects/" + projectId + "/tasks/" + taskId + "/comments",
+    comment, successCallback, errorCallback
+);
+```
+
+### 14.14 Gestion des Erreurs
+
+```javascript
+spiraAppManager.executeApi(
+    "MyApp", "7.0", "GET",
+    "projects/" + projectId + "/tasks",
+    null,
+    function(response) {
+        // Succes
+        if (Array.isArray(response)) {
+            console.log("Taches recues:", response.length);
+        }
+    },
+    function(error) {
+        // Erreur
+        console.error("Erreur API:", error);
+
+        // Types d'erreurs courants:
+        // - 401: Non authentifie
+        // - 403: Acces refuse
+        // - 404: Ressource non trouvee
+        // - 409: Conflit de concurrence (ConcurrencyDate invalide)
+        // - 500: Erreur serveur
+    }
+);
+```
+
+### 14.15 Bonnes Pratiques API
+
+1. **Toujours utiliser la pagination** pour les listes:
+   ```javascript
+   "?starting_row=0&number_of_rows=100"
+   ```
+
+2. **Recuperer ConcurrencyDate avant PUT**:
+   ```javascript
+   // 1. GET pour obtenir ConcurrencyDate
+   // 2. PUT avec ConcurrencyDate inclus
+   ```
+
+3. **Format des dates**: ISO 8601 UTC
+   ```javascript
+   "2024-01-15T14:30:00.000Z"
+   ```
+
+4. **Effort en minutes**:
+   ```javascript
+   EstimatedEffort: 480  // = 8 heures
+   ```
+
+5. **Ne pas envoyer de valeurs null dans les filtres**
+
+---
+
 *Document genere a partir des recherches sur la documentation officielle Inflectra.*
+*Mise a jour: Janvier 2026 - API REST v7.0*

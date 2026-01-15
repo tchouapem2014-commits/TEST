@@ -727,9 +727,13 @@
 
     /**
      * Recupere la liste des taches du projet
+     * Utilise la pagination pour eviter les timeouts
      */
     function getProjectTasks(callback) {
-        var url = "projects/" + stState.currentProjectId + "/tasks";
+        // L'API Spira requiert des parametres de pagination
+        var url = "projects/" + stState.currentProjectId + "/tasks?start_row=1&number_of_rows=500";
+
+        log("DEBUG", "Fetching tasks from:", url);
 
         spiraAppManager.executeApi(
             "SmartTasks",
@@ -738,10 +742,16 @@
             url,
             null,
             function(response) {
-                response.forEach(function(task) {
-                    stState.taskCache[task.TaskId] = task;
-                });
-                callback(response);
+                log("DEBUG", "Tasks received:", response ? response.length : 0);
+                if (response && Array.isArray(response)) {
+                    response.forEach(function(task) {
+                        stState.taskCache[task.TaskId] = task;
+                    });
+                    callback(response);
+                } else {
+                    log("WARN", "Unexpected response format", response);
+                    callback([]);
+                }
             },
             function(error) {
                 log("ERROR", "Failed to get project tasks", error);
