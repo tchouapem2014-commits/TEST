@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CapX Pro - Test Page</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #0066cc;
+            border-bottom: 2px solid #0066cc;
+            padding-bottom: 10px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #0066cc;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0052a3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #1e7e34;
+        }
+
+        /* Fake RadEditor toolbar for testing */
+        .fake-editor {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .reToolbar {
+            background: linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 100%);
+            padding: 5px;
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .reTool {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            margin: 1px;
+            padding: 3px;
+            border: 1px solid #999;
+            border-radius: 3px;
+            background: linear-gradient(180deg, #fff 0%, #e8e8e8 100%);
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .reTool:hover {
+            background: linear-gradient(180deg, #e8f4fc 0%, #cce4f7 100%);
+            border-color: #0078d4;
+        }
+        .editor-content {
+            min-height: 200px;
+            padding: 15px;
+            background: white;
+        }
+        .editor-content[contenteditable] {
+            outline: none;
+        }
+        .editor-content img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            margin: 5px 0;
+        }
+
+        /* Console log display */
+        #console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #console-output .log-entry {
+            margin: 2px 0;
+            padding: 2px 0;
+            border-bottom: 1px solid #333;
+        }
+        #console-output .log-debug { color: #9cdcfe; }
+        #console-output .log-error { color: #f48771; }
+        #console-output .log-info { color: #dcdcaa; }
+
+        /* Status indicator */
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-pending { background: #fff3cd; color: #856404; }
+
+        /* Info box */
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #0066cc;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        .info-box code {
+            background: #d4e5f7;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CapX Pro - Test Page</h1>
+        <p class="subtitle">Test tui.image-editor integration outside SpiraPlan</p>
+
+        <!-- Status Section -->
+        <div class="test-section">
+            <h2>Library Status</h2>
+            <p>
+                <strong>Fabric.js:</strong>
+                <span id="status-fabric" class="status status-pending">Checking...</span>
+            </p>
+            <p>
+                <strong>tui.code-snippet:</strong>
+                <span id="status-snippet" class="status status-pending">Checking...</span>
+            </p>
+            <p>
+                <strong>tui.colorPicker:</strong>
+                <span id="status-colorpicker" class="status status-pending">Checking...</span>
+            </p>
+            <p>
+                <strong>tui.ImageEditor:</strong>
+                <span id="status-imageeditor" class="status status-pending">Checking...</span>
+            </p>
+            <p>
+                <strong>CAPX:</strong>
+                <span id="status-capx" class="status status-pending">Checking...</span>
+            </p>
+        </div>
+
+        <!-- Capture Test Section -->
+        <div class="test-section">
+            <h2>Capture Test</h2>
+            <div class="info-box">
+                <strong>Instructions:</strong> Click "Capture Screen" to test the screen capture and tui.image-editor.
+                The editor should open with crop, draw, shapes, text, and filter tools.
+            </div>
+            <button class="btn btn-primary" onclick="testCapture()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;vertical-align:middle">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                </svg>
+                Capture Screen
+            </button>
+            <button class="btn btn-secondary" onclick="testInjectButtons()">
+                Inject Buttons
+            </button>
+            <button class="btn btn-success" onclick="checkStatus()">
+                Refresh Status
+            </button>
+        </div>
+
+        <!-- Fake Editor Section -->
+        <div class="test-section">
+            <h2>Simulated RichText Editor</h2>
+            <p>This simulates a SpiraPlan RadEditor toolbar. The CapX button should be injected here.</p>
+            <div class="fake-editor">
+                <div class="reToolbar">
+                    <button class="reTool" title="Bold"><b>B</b></button>
+                    <button class="reTool" title="Italic"><i>I</i></button>
+                    <button class="reTool" title="Underline"><u>U</u></button>
+                    <span style="width:1px;height:20px;background:#ccc;margin:0 5px;"></span>
+                    <button class="reTool" title="List">&#8226;</button>
+                    <button class="reTool" title="Link">&#128279;</button>
+                    <!-- CapX button will be injected here -->
+                </div>
+                <div class="editor-content" contenteditable="true" id="editor-content">
+                    <p>Click in this area and paste (Ctrl+V) after capturing a screenshot.</p>
+                    <p>Or click the CapX button in the toolbar above to capture directly.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Console Output -->
+        <div class="test-section">
+            <h2>Console Output</h2>
+            <button class="btn btn-secondary" onclick="clearConsole()" style="margin-bottom:10px">Clear</button>
+            <div id="console-output">
+                <div class="log-entry log-info">Console initialized. Waiting for CapX logs...</div>
+            </div>
+        </div>
+
+        <!-- API Test Section -->
+        <div class="test-section">
+            <h2>API Test</h2>
+            <div class="info-box">
+                <p>Test the CAPX global API:</p>
+                <ul>
+                    <li><code>CAPX.version</code> - Get version</li>
+                    <li><code>CAPX.capture()</code> - Start capture</li>
+                    <li><code>CAPX.injectButtons()</code> - Inject toolbar buttons</li>
+                    <li><code>CAPX.getState()</code> - Get internal state</li>
+                </ul>
+            </div>
+            <button class="btn btn-secondary" onclick="testAPI('version')">Get Version</button>
+            <button class="btn btn-secondary" onclick="testAPI('state')">Get State</button>
+        </div>
+    </div>
+
+    <!-- Load CapX with embedded libraries -->
+    <script src="capx.js"></script>
+
+    <script>
+        // Override console.log to capture CapX logs
+        var originalLog = console.log;
+        console.log = function() {
+            var args = Array.prototype.slice.call(arguments);
+            var message = args.map(function(arg) {
+                if (typeof arg === 'object') {
+                    try {
+                        return JSON.stringify(arg, null, 2);
+                    } catch(e) {
+                        return String(arg);
+                    }
+                }
+                return String(arg);
+            }).join(' ');
+
+            // Check if it's a CapX log
+            if (message.indexOf('[CapX]') !== -1) {
+                addToConsole(message);
+            }
+
+            // Call original
+            originalLog.apply(console, arguments);
+        };
+
+        function addToConsole(message) {
+            var output = document.getElementById('console-output');
+            var entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            if (message.indexOf('ERROR') !== -1) {
+                entry.className += ' log-error';
+            } else if (message.indexOf('DEBUG') !== -1) {
+                entry.className += ' log-debug';
+            } else {
+                entry.className += ' log-info';
+            }
+
+            entry.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+            output.appendChild(entry);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearConsole() {
+            var output = document.getElementById('console-output');
+            output.innerHTML = '<div class="log-entry log-info">Console cleared.</div>';
+        }
+
+        function setStatus(id, success, text) {
+            var el = document.getElementById(id);
+            el.className = 'status ' + (success ? 'status-success' : 'status-error');
+            el.textContent = text || (success ? 'Loaded' : 'Not Found');
+        }
+
+        function checkStatus() {
+            // Check Fabric.js
+            setStatus('status-fabric', typeof fabric !== 'undefined');
+
+            // Check tui.code-snippet
+            setStatus('status-snippet', typeof tui !== 'undefined' && typeof tui.util !== 'undefined');
+
+            // Check tui.colorPicker
+            setStatus('status-colorpicker', typeof tui !== 'undefined' && typeof tui.colorPicker !== 'undefined');
+
+            // Check tui.ImageEditor
+            setStatus('status-imageeditor', typeof tui !== 'undefined' && typeof tui.ImageEditor !== 'undefined');
+
+            // Check CAPX
+            setStatus('status-capx', typeof CAPX !== 'undefined', typeof CAPX !== 'undefined' ? 'v' + CAPX.version : 'Not Found');
+        }
+
+        function testCapture() {
+            if (typeof CAPX !== 'undefined') {
+                addToConsole('[Test] Starting capture via CAPX.capture()');
+                CAPX.capture();
+            } else {
+                addToConsole('[Test] ERROR: CAPX not loaded!');
+                alert('CAPX is not loaded. Check the console for errors.');
+            }
+        }
+
+        function testInjectButtons() {
+            if (typeof CAPX !== 'undefined') {
+                addToConsole('[Test] Injecting buttons via CAPX.injectButtons()');
+                CAPX.injectButtons();
+            } else {
+                addToConsole('[Test] ERROR: CAPX not loaded!');
+            }
+        }
+
+        function testAPI(action) {
+            if (typeof CAPX === 'undefined') {
+                addToConsole('[Test] ERROR: CAPX not loaded!');
+                return;
+            }
+
+            switch(action) {
+                case 'version':
+                    addToConsole('[Test] CAPX.version = ' + CAPX.version);
+                    alert('CAPX Version: ' + CAPX.version);
+                    break;
+                case 'state':
+                    var state = CAPX.getState();
+                    addToConsole('[Test] CAPX.getState() = ' + JSON.stringify(state, null, 2));
+                    console.log('CAPX State:', state);
+                    break;
+            }
+        }
+
+        // Check status on load
+        window.addEventListener('load', function() {
+            setTimeout(checkStatus, 500);
+            addToConsole('[Test] Page loaded. Checking library status...');
+        });
+    </script>
+</body>
+</html>

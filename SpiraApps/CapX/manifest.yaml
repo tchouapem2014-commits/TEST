@@ -1,0 +1,242 @@
+# ============================================================
+# CAPX - Professional Screenshot Capture & Annotation
+# SpiraApp Manifest - Version 1.0.0
+# ============================================================
+# Powered by tui.image-editor for professional editing
+# Successor to SpiraXCapture with modern UI/UX
+# ============================================================
+
+guid: b2c3d4e5-f6a7-8901-bcde-f23456789012
+name: CapX
+caption: CapX Pro
+summary: Professional screenshot capture with advanced annotation tools
+description: >-
+  CapX is a professional screenshot capture tool powered by tui.image-editor.
+  It provides advanced annotation capabilities including blur, crop, shapes,
+  text, filters and more. Captured images can be edited and inserted directly
+  into RichText fields with a modern, intuitive interface.
+productSummary: Professional capture & annotation for SpiraPlan
+productDescription: >-
+  Advanced screenshot capture with tui.image-editor integration. Features include
+  blur/pixelate, crop, rotate, shapes, arrows, text annotations, filters, and
+  direct insertion into RichText editors. Modern UI inspired by Shottr and CleanShot X.
+version: 1.0
+author: SpiraApps Developer
+license: MIT
+copyright: Copyright 2026
+url: https://github.com/spiraapps/capx
+
+# ============================================================
+# PRODUCT SETTINGS
+# ============================================================
+
+productSettings:
+
+  # Capture quality for JPEG
+  - settingTypeId: 1
+    name: capture_quality
+    caption: Capture Quality (0.1-1.0)
+    position: 1
+    placeholder: "0.92"
+    tooltip: >-
+      JPEG compression quality (0.1 = low, 1.0 = maximum).
+      Ignored for PNG format.
+
+  # Capture format
+  - settingTypeId: 1
+    name: capture_format
+    caption: Format (png/jpeg)
+    position: 2
+    placeholder: "png"
+    tooltip: >-
+      Output image format. PNG for maximum quality, JPEG for smaller size.
+
+  # Auto timestamp
+  - settingTypeId: 10
+    name: auto_timestamp
+    caption: Add timestamp to filename
+    position: 3
+    tooltip: >-
+      Automatically adds date and time to the captured filename.
+
+  # Theme
+  - settingTypeId: 1
+    name: editor_theme
+    caption: Editor Theme (light/dark)
+    position: 4
+    placeholder: "light"
+    tooltip: >-
+      Color theme for the image editor interface. Default is light.
+
+  # Debug mode
+  - settingTypeId: 10
+    name: debug_mode
+    caption: Debug Mode
+    position: 5
+    tooltip: Show logs in browser console (F12)
+
+# ============================================================
+# PAGE CONTENTS - Inject script on detail pages
+# ============================================================
+
+pageContents:
+  # RequirementDetails
+  - pageId: 9
+    name: capx
+    code: "file://capx.js"
+
+  # TestCaseDetails
+  - pageId: 10
+    name: capx
+    code: "file://capx.js"
+
+  # TestSetDetails
+  - pageId: 11
+    name: capx
+    code: "file://capx.js"
+
+  # IncidentDetails
+  - pageId: 14
+    name: capx
+    code: "file://capx.js"
+
+  # TaskDetails
+  - pageId: 15
+    name: capx
+    code: "file://capx.js"
+
+  # ReleaseDetails
+  - pageId: 16
+    name: capx
+    code: "file://capx.js"
+
+# ============================================================
+# MENUS - Capture button in toolbar
+# ============================================================
+
+menus:
+  # RequirementDetails
+  - pageId: 9
+    caption: CapX
+    icon: fa-solid fa-camera
+    isActive: true
+    entries:
+      - name: captureScreen
+        caption: Capture Screen
+        tooltip: Capture screen and attach to requirement
+        icon: fa-solid fa-camera-retro
+        isActive: true
+        actionTypeId: 2
+        action: captureScreen
+      - name: captureArea
+        caption: Capture Area
+        tooltip: Capture selected area
+        icon: fa-solid fa-crop
+        isActive: true
+        actionTypeId: 2
+        action: captureArea
+
+  # TestCaseDetails
+  - pageId: 10
+    caption: CapX
+    icon: fa-solid fa-camera
+    isActive: true
+    entries:
+      - name: captureScreen
+        caption: Capture Screen
+        tooltip: Capture screen and attach to test case
+        icon: fa-solid fa-camera-retro
+        isActive: true
+        actionTypeId: 2
+        action: captureScreen
+      - name: captureArea
+        caption: Capture Area
+        tooltip: Capture selected area
+        icon: fa-solid fa-crop
+        isActive: true
+        actionTypeId: 2
+        action: captureArea
+
+  # TestSetDetails
+  - pageId: 11
+    caption: CapX
+    icon: fa-solid fa-camera
+    isActive: true
+    entries:
+      - name: captureScreen
+        caption: Capture Screen
+        tooltip: Capture screen and attach to test set
+        icon: fa-solid fa-camera-retro
+        isActive: true
+        actionTypeId: 2
+        action: captureScreen
+      - name: captureArea
+        caption: Capture Area
+        tooltip: Capture selected area
+        icon: fa-solid fa-crop
+        isActive: true
+        actionTypeId: 2
+        action: captureArea
+
+  # IncidentDetails
+  - pageId: 14
+    caption: CapX
+    icon: fa-solid fa-camera
+    isActive: true
+    entries:
+      - name: captureScreen
+        caption: Capture Screen
+        tooltip: Capture screen and attach to incident
+        icon: fa-solid fa-camera-retro
+        isActive: true
+        actionTypeId: 2
+        action: captureScreen
+      - name: captureArea
+        caption: Capture Area
+        tooltip: Capture selected area
+        icon: fa-solid fa-crop
+        isActive: true
+        actionTypeId: 2
+        action: captureArea
+
+  # TaskDetails
+  - pageId: 15
+    caption: CapX
+    icon: fa-solid fa-camera
+    isActive: true
+    entries:
+      - name: captureScreen
+        caption: Capture Screen
+        tooltip: Capture screen and attach to task
+        icon: fa-solid fa-camera-retro
+        isActive: true
+        actionTypeId: 2
+        action: captureScreen
+      - name: captureArea
+        caption: Capture Area
+        tooltip: Capture selected area
+        icon: fa-solid fa-crop
+        isActive: true
+        actionTypeId: 2
+        action: captureArea
+
+  # ReleaseDetails
+  - pageId: 16
+    caption: CapX
+    icon: fa-solid fa-camera
+    isActive: true
+    entries:
+      - name: captureScreen
+        caption: Capture Screen
+        tooltip: Capture screen and attach to release
+        icon: fa-solid fa-camera-retro
+        isActive: true
+        actionTypeId: 2
+        action: captureScreen
+      - name: captureArea
+        caption: Capture Area
+        tooltip: Capture selected area
+        icon: fa-solid fa-crop
+        isActive: true
+        actionTypeId: 2
+        action: captureArea
