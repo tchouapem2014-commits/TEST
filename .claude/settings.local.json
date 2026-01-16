@@ -78,7 +78,31 @@
       "Bash(Select-String -Pattern \"Test 10|Test 11|SUCCESS|ERROR|Structure|Task\")",
       "Bash(Select-Object -Last 50)",
       "Bash({type})",
-      "Bash({lag}\"\n- Fix PUT /tasks to send complete task object with JSON.stringify\n- Correct all French accents in UI messages and comments\n- Update test_api.ps1 with comprehensive API tests\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash({lag}\"\n- Fix PUT /tasks to send complete task object with JSON.stringify\n- Correct all French accents in UI messages and comments\n- Update test_api.ps1 with comprehensive API tests\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(cmd //c:*)",
+      "Bash(tasklist:*)",
+      "Bash(set npm_config_input=d:RRRRSpiraAppsCapX )",
+      "Bash(set npm_config_output=d:RRRRSpiraAppsCapX )",
+      "Bash(\"d:\\\\RRRR\\\\SpiraApps\\\\CapX\\\\build.bat\")",
+      "Bash(echo $env:USERPROFILE)",
+      "Bash(claude mcp add:*)",
+      "Bash(set \"npm_config_input=d:\\\\RRRR\\\\SpiraApps\\\\NextEditor\")",
+      "Bash(git checkout:*)",
+      "Bash(start chrome:*)",
+      "Bash(echo:*)",
+      "Bash(findstr:*)",
+      "Bash(claude --debug:*)",
+      "Bash(npm search:*)",
+      "mcp__chrome-devtools__new_page",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__list_console_messages",
+      "mcp__chrome-devtools__evaluate_script",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__wait_for",
+      "Bash(psql:*)",
+      "Bash(sc query:*)",
+      "mcp__chrome-devtools__list_pages"
     ]
   }
 }

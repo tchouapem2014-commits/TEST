@@ -18,7 +18,7 @@ productSummary: Capture, edit and insert screenshots into RichText
 productDescription: >-
   Screenshot capture with built-in image editor. Injects capture button into
   RichText toolbars. Edit screenshots before insertion (crop, draw, arrows, text).
-version: 2.0
+version: 2.0.0
 author: SpiraApps Developer
 license: MIT
 copyright: Copyright 2026

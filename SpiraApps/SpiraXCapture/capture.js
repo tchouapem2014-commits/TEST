@@ -58,7 +58,7 @@
     // ============================================================
     var sxcState = {
         settings: null,
-        debugMode: false,
+        debugMode: true,  // Activé temporairement pour debug
         captureQuality: 0.9,
         captureFormat: "png",
         autoTimestamp: true,
@@ -66,7 +66,12 @@
         editorDialog: null,
         fabricCanvas: null,
         capturedImage: null,
-        selectedTool: 'select'
+        selectedTool: 'select',
+        // Nouveaux outils v2.0
+        stepCounter: 1,           // Compteur pour l'outil Number
+        blurPixelSize: 16,        // Taille des pixels pour le blur (8, 16, 32)
+        highlightOpacity: 0.4,    // Opacité du surligneur
+        spotlightOverlay: null    // Référence à l'overlay spotlight
     };
 
     // ============================================================
@@ -267,7 +272,7 @@
                 return { type: 'radeditor', instance: radEditor, container: editorContainer };
             }
 
-            // Chercher un ID d'editeur dans les enfants
+            // Chercher un ID d'editeur dans les enfants (SpiraPlan utilise des IDs comme txtDescription)
             var editorElement = editorContainer.querySelector('[id*="Editor"], [id*="txt"]');
             if (editorElement) {
                 radEditor = $find(editorElement.id);
@@ -276,18 +281,59 @@
                     return { type: 'radeditor', instance: radEditor, container: editorContainer };
                 }
             }
+
+            // SpiraPlan: Chercher par la structure DOM typique (.RadEditor contient un element avec ID)
+            // Le RadEditor est souvent trouvé via l'ID de l'élément principal dans le conteneur
+            var allElementsWithId = editorContainer.querySelectorAll('[id]');
+            for (var i = 0; i < allElementsWithId.length; i++) {
+                var el = allElementsWithId[i];
+                if (el.id && el.id.indexOf('cpl') !== -1) {
+                    radEditor = $find(el.id);
+                    if (radEditor && radEditor.pasteHtml) {
+                        sxcLog("DEBUG", "Found RadEditor via DOM search:", el.id);
+                        return { type: 'radeditor', instance: radEditor, container: editorContainer };
+                    }
+                }
+            }
+
+            // Dernier essai: parcourir TOUS les objets Telerik enregistrés
+            if (typeof Sys !== 'undefined' && Sys.Application && Sys.Application.getComponents) {
+                var components = Sys.Application.getComponents();
+                for (var i = 0; i < components.length; i++) {
+                    var comp = components[i];
+                    if (comp && comp.pasteHtml && comp.get_element) {
+                        var compElement = comp.get_element();
+                        if (editorContainer.contains(compElement) || compElement === editorContainer) {
+                            sxcLog("DEBUG", "Found RadEditor via Sys.Application.getComponents");
+                            return { type: 'radeditor', instance: comp, container: editorContainer };
+                        }
+                    }
+                }
+            }
         }
 
         // Telerik via namespace global
         if (typeof Telerik !== 'undefined' && Telerik.Web && Telerik.Web.UI && Telerik.Web.UI.RadEditor) {
             if (Telerik.Web.UI.RadEditor.get_editors) {
                 var editors = Telerik.Web.UI.RadEditor.get_editors();
+                sxcLog("DEBUG", "Found " + editors.length + " RadEditors via get_editors()");
                 for (var i = 0; i < editors.length; i++) {
                     var ed = editors[i];
-                    if (ed.get_element && ed.get_element() === editorContainer) {
-                        sxcLog("DEBUG", "Found RadEditor via get_editors");
-                        return { type: 'radeditor', instance: ed, container: editorContainer };
+                    if (ed.get_element) {
+                        var edElement = ed.get_element();
+                        // Vérifier si le conteneur contient cet éditeur ou est cet éditeur
+                        if (edElement === editorContainer ||
+                            editorContainer.contains(edElement) ||
+                            (edElement && edElement.contains && edElement.contains(editorContainer))) {
+                            sxcLog("DEBUG", "Found RadEditor via get_editors, index:", i);
+                            return { type: 'radeditor', instance: ed, container: editorContainer };
+                        }
                     }
+                }
+                // Si un seul éditeur existe, l'utiliser par défaut
+                if (editors.length === 1) {
+                    sxcLog("DEBUG", "Using single RadEditor by default");
+                    return { type: 'radeditor', instance: editors[0], container: editorContainer };
                 }
             }
         }
@@ -331,6 +377,8 @@
     // INSERTION DANS L'EDITEUR
     // ============================================================
     function insertHtmlToEditor(editorInfo, html) {
+        sxcLog("DEBUG", "insertHtmlToEditor called, editorInfo:", editorInfo ? editorInfo.type : "null");
+
         if (!editorInfo || !editorInfo.instance) {
             sxcLog("DEBUG", "No editor instance, trying fallback methods");
             return insertFallback(editorInfo, html);
@@ -338,9 +386,52 @@
 
         switch (editorInfo.type) {
             case 'radeditor':
-                editorInfo.instance.pasteHtml(html);
-                sxcLog("DEBUG", "Inserted via RadEditor.pasteHtml");
-                return true;
+                try {
+                    var radEd = editorInfo.instance;
+                    sxcLog("DEBUG", "RadEditor methods available:", {
+                        pasteHtml: typeof radEd.pasteHtml,
+                        setHtml: typeof radEd.set_html,
+                        getHtml: typeof radEd.get_html,
+                        fire: typeof radEd.fire
+                    });
+
+                    // Méthode 1: pasteHtml (préférée)
+                    if (typeof radEd.pasteHtml === 'function') {
+                        radEd.pasteHtml(html);
+                        sxcLog("DEBUG", "Inserted via RadEditor.pasteHtml");
+                        return true;
+                    }
+
+                    // Méthode 2: get_html/set_html
+                    if (typeof radEd.get_html === 'function' && typeof radEd.set_html === 'function') {
+                        var currentHtml = radEd.get_html(true) || '';
+                        radEd.set_html(currentHtml + html);
+                        sxcLog("DEBUG", "Inserted via RadEditor.set_html");
+                        return true;
+                    }
+
+                    // Méthode 3: Via le contentArea iframe
+                    if (typeof radEd.get_contentArea === 'function') {
+                        var contentArea = radEd.get_contentArea();
+                        if (contentArea && contentArea.contentDocument) {
+                            var doc = contentArea.contentDocument;
+                            var range = doc.createRange();
+                            var sel = doc.getSelection ? doc.getSelection() : doc.defaultView.getSelection();
+
+                            // Insérer à la fin du body
+                            var body = doc.body;
+                            body.innerHTML = body.innerHTML + html;
+                            sxcLog("DEBUG", "Inserted via contentArea manipulation");
+                            return true;
+                        }
+                    }
+
+                    sxcLog("ERROR", "No RadEditor insert method worked");
+                    return insertFallback(editorInfo, html);
+                } catch (e) {
+                    sxcLog("ERROR", "RadEditor insert failed:", e);
+                    return insertFallback(editorInfo, html);
+                }
 
             case 'tinymce':
                 editorInfo.instance.insertContent(html);
@@ -364,18 +455,22 @@
     }
 
     function insertFallback(editorInfo, html) {
+        sxcLog("DEBUG", "insertFallback called");
+
         // Essayer via spiraAppManager.updateFormField si disponible
         if (typeof spiraAppManager !== 'undefined' && spiraAppManager.updateFormField) {
             // Trouver le field name
             var container = editorInfo ? editorInfo.container : null;
             if (container) {
                 var fieldId = container.id || '';
+                sxcLog("DEBUG", "Container ID:", fieldId);
+
                 // Extraire le nom du champ (ex: ctl00_cplMainContent_txtDescription -> Description)
                 var match = fieldId.match(/txt(\w+)$/);
                 if (match) {
                     var fieldName = match[1];
                     try {
-                        // Recuperer la valeur actuelle et ajouter l'image
+                        // Récupérer la valeur actuelle et ajouter l'image
                         var currentValue = spiraAppManager.getDataItemFieldValue(fieldName) || '';
                         spiraAppManager.updateFormField(fieldName, currentValue + html);
                         sxcLog("DEBUG", "Inserted via updateFormField:", fieldName);
@@ -383,6 +478,39 @@
                     } catch (e) {
                         sxcLog("ERROR", "updateFormField failed", e);
                     }
+                }
+            }
+        }
+
+        // Essayer directement sur RadEditor si disponible globalement
+        if (typeof Telerik !== 'undefined' && Telerik.Web && Telerik.Web.UI && Telerik.Web.UI.RadEditor) {
+            if (Telerik.Web.UI.RadEditor.get_editors) {
+                var editors = Telerik.Web.UI.RadEditor.get_editors();
+                if (editors && editors.length > 0) {
+                    // Utiliser le premier éditeur trouvé
+                    var editor = editors[0];
+                    if (editor.pasteHtml) {
+                        editor.pasteHtml(html);
+                        sxcLog("DEBUG", "Inserted via global RadEditor fallback");
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Essayer via $find avec ID Description (courant dans SpiraPlan)
+        if (typeof $find === 'function') {
+            var commonIds = [
+                'ctl00_cplMainContent_txtDescription',
+                'cplMainContent_txtDescription',
+                'txtDescription'
+            ];
+            for (var i = 0; i < commonIds.length; i++) {
+                var ed = $find(commonIds[i]);
+                if (ed && ed.pasteHtml) {
+                    ed.pasteHtml(html);
+                    sxcLog("DEBUG", "Inserted via $find fallback:", commonIds[i]);
+                    return true;
                 }
             }
         }
@@ -601,8 +729,9 @@
             }
         };
 
-        // Fermer avec Escape
+        // Fermer avec Escape et raccourcis clavier
         document.addEventListener('keydown', handleEscapeKey);
+        document.addEventListener('keydown', handleKeyboardShortcuts);
 
         return overlay;
     }
@@ -621,21 +750,36 @@
         ].join(';');
 
         var tools = [
-            { id: 'select', icon: '&#x2B9E;', title: 'Select / Move' },
-            { id: 'crop', icon: '&#x2702;', title: 'Crop' },
-            { id: 'draw', icon: '&#x270F;', title: 'Free Draw' },
-            { id: 'line', icon: '&#x2571;', title: 'Line' },
-            { id: 'arrow', icon: '&#x2192;', title: 'Arrow' },
-            { id: 'rect', icon: '&#x25A1;', title: 'Rectangle' },
-            { id: 'ellipse', icon: '&#x25CB;', title: 'Ellipse' },
-            { id: 'text', icon: 'T', title: 'Text' }
+            { id: 'select', icon: '&#x2B9E;', title: 'Select / Move (V)', key: 'V' },
+            { id: 'arrow', icon: '&#x2192;', title: 'Arrow (A)', key: 'A' },
+            { id: 'rect', icon: '&#x25A1;', title: 'Rectangle (R)', key: 'R' },
+            { id: 'ellipse', icon: '&#x25CB;', title: 'Ellipse (E)', key: 'E' },
+            { id: 'line', icon: '&#x2571;', title: 'Line (L)', key: 'L' },
+            { id: 'text', icon: 'T', title: 'Text (T)', key: 'T' },
+            { id: 'draw', icon: '&#x270F;', title: 'Free Draw', key: null },
+            { id: 'separator1', icon: null, title: null, key: null },
+            { id: 'blur', icon: '&#x25A8;', title: 'Blur/Pixelate (B)', key: 'B' },
+            { id: 'number', icon: '&#x2460;', title: 'Numbering (N)', key: 'N' },
+            { id: 'spotlight', icon: '&#x2600;', title: 'Spotlight (S)', key: 'S' },
+            { id: 'highlight', icon: '&#x1F58C;', title: 'Highlight (H)', key: 'H' }
         ];
 
         tools.forEach(function(tool) {
+            // Gestion des séparateurs
+            if (tool.id.indexOf('separator') === 0) {
+                var sep = document.createElement('span');
+                sep.style.cssText = 'width: 1px; height: 24px; background: #ddd; margin: 0 4px;';
+                toolbar.appendChild(sep);
+                return;
+            }
+
             var btn = document.createElement('button');
             btn.className = 'sxc-tool-btn';
             btn.setAttribute('data-tool', tool.id);
             btn.setAttribute('title', tool.title);
+            if (tool.key) {
+                btn.setAttribute('data-key', tool.key);
+            }
             btn.style.cssText = [
                 'width: 36px',
                 'height: 36px',
@@ -787,6 +931,64 @@
         }
     }
 
+    /**
+     * Gestionnaire de raccourcis clavier pour les outils
+     */
+    function handleKeyboardShortcuts(e) {
+        // Ignorer si on est dans un champ de saisie
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        // Seulement si le dialog est ouvert
+        if (!sxcState.editorDialog) return;
+
+        var key = e.key.toUpperCase();
+        var toolId = null;
+
+        switch (key) {
+            case 'V': toolId = 'select'; break;
+            case 'A': toolId = 'arrow'; break;
+            case 'R': toolId = 'rect'; break;
+            case 'E': toolId = 'ellipse'; break;
+            case 'L': toolId = 'line'; break;
+            case 'T': toolId = 'text'; break;
+            case 'B': toolId = 'blur'; break;
+            case 'N': toolId = 'number'; break;
+            case 'S': toolId = 'spotlight'; break;
+            case 'H': toolId = 'highlight'; break;
+            case 'Z':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    undoAction();
+                    return;
+                }
+                break;
+            case 'DELETE':
+            case 'BACKSPACE':
+                deleteSelected();
+                return;
+        }
+
+        if (toolId) {
+            e.preventDefault();
+            selectTool(toolId);
+
+            // Mettre à jour visuellement les boutons de la toolbar
+            var toolbar = document.querySelector('.sxc-toolbar');
+            if (toolbar) {
+                toolbar.querySelectorAll('.sxc-tool-btn').forEach(function(btn) {
+                    btn.style.background = '#fff';
+                    btn.style.borderColor = '#ccc';
+                    if (btn.getAttribute('data-tool') === toolId) {
+                        btn.style.background = '#e3f2fd';
+                        btn.style.borderColor = '#2196f3';
+                    }
+                });
+            }
+        }
+    }
+
     function closeImageEditor() {
         if (sxcState.editorDialog) {
             sxcState.editorDialog.remove();
@@ -797,7 +999,9 @@
             sxcState.fabricCanvas = null;
         }
         sxcState.capturedImage = null;
+        sxcState.stepCounter = 1;  // Réinitialiser le compteur
         document.removeEventListener('keydown', handleEscapeKey);
+        document.removeEventListener('keydown', handleKeyboardShortcuts);
     }
 
     // ============================================================
@@ -904,8 +1108,17 @@
                     ctx.fillStyle = colorPicker.value;
                     ctx.font = (parseInt(strokeWidth.value) * 5) + 'px Arial';
                     ctx.fillText(text, startX, startY);
-                    saveAnnotation('text', { x: startX, y: startY, text: text });
+                    saveAnnotation('text', { x: startX, y: startY, text: text, fontSize: parseInt(strokeWidth.value) * 5 });
                 }
+                state.isDrawing = false;
+            }
+
+            // Outil Number: placement immédiat au clic
+            if (sxcState.selectedTool === 'number') {
+                var num = sxcState.stepCounter;
+                drawNumberBadge(ctx, startX, startY, num, colorPicker.value);
+                saveAnnotation('number', { x: startX, y: startY, num: num });
+                sxcState.stepCounter++;
                 state.isDrawing = false;
             }
         };
@@ -965,6 +1178,24 @@
                     drawEllipse(ctx, startX, startY, endX - startX, endY - startY);
                     saveAnnotation('ellipse', { x: startX, y: startY, w: endX - startX, h: endY - startY });
                     break;
+
+                case 'blur':
+                    // Appliquer le flou/pixelisation sur la zone
+                    drawBlur(ctx, startX, startY, endX - startX, endY - startY, sxcState.blurPixelSize);
+                    saveAnnotation('blur', { x: startX, y: startY, w: endX - startX, h: endY - startY, pixelSize: sxcState.blurPixelSize });
+                    break;
+
+                case 'highlight':
+                    // Surligneur jaune semi-transparent
+                    drawHighlight(ctx, startX, startY, endX - startX, endY - startY, '#FFFF00', sxcState.highlightOpacity);
+                    saveAnnotation('highlight', { x: startX, y: startY, w: endX - startX, h: endY - startY });
+                    break;
+
+                case 'spotlight':
+                    // Spotlight: assombrissement avec zone éclairée
+                    drawSpotlight(ctx, startX, startY, endX - startX, endY - startY, state.width, state.height);
+                    saveAnnotation('spotlight', { x: startX, y: startY, w: endX - startX, h: endY - startY });
+                    break;
             }
         };
     }
@@ -997,9 +1228,172 @@
         ctx.stroke();
     }
 
+    // ============================================================
+    // NOUVEAUX OUTILS v2.0 - Blur, Number, Spotlight, Highlight
+    // ============================================================
+
+    /**
+     * Outil BLUR - Pixelise une zone rectangulaire
+     * @param {CanvasRenderingContext2D} ctx - Contexte canvas
+     * @param {number} x - Position X
+     * @param {number} y - Position Y
+     * @param {number} w - Largeur
+     * @param {number} h - Hauteur
+     * @param {number} pixelSize - Taille des pixels (8, 16, 32)
+     */
+    function drawBlur(ctx, x, y, w, h, pixelSize) {
+        pixelSize = pixelSize || sxcState.blurPixelSize;
+
+        // Normaliser les coordonnées (gérer les dessins inversés)
+        var nx = w < 0 ? x + w : x;
+        var ny = h < 0 ? y + h : y;
+        var nw = Math.abs(w);
+        var nh = Math.abs(h);
+
+        if (nw < 2 || nh < 2) return;
+
+        // Récupérer les données de l'image dans la zone
+        var imageData = ctx.getImageData(nx, ny, nw, nh);
+        var data = imageData.data;
+
+        // Pixelisation
+        for (var py = 0; py < nh; py += pixelSize) {
+            for (var px = 0; px < nw; px += pixelSize) {
+                // Calculer la couleur moyenne du bloc
+                var r = 0, g = 0, b = 0, count = 0;
+
+                for (var by = 0; by < pixelSize && py + by < nh; by++) {
+                    for (var bx = 0; bx < pixelSize && px + bx < nw; bx++) {
+                        var idx = ((py + by) * nw + (px + bx)) * 4;
+                        r += data[idx];
+                        g += data[idx + 1];
+                        b += data[idx + 2];
+                        count++;
+                    }
+                }
+
+                r = Math.floor(r / count);
+                g = Math.floor(g / count);
+                b = Math.floor(b / count);
+
+                // Appliquer la couleur moyenne à tout le bloc
+                for (var by = 0; by < pixelSize && py + by < nh; by++) {
+                    for (var bx = 0; bx < pixelSize && px + bx < nw; bx++) {
+                        var idx = ((py + by) * nw + (px + bx)) * 4;
+                        data[idx] = r;
+                        data[idx + 1] = g;
+                        data[idx + 2] = b;
+                    }
+                }
+            }
+        }
+
+        ctx.putImageData(imageData, nx, ny);
+        sxcLog("DEBUG", "Blur applied to region:", { x: nx, y: ny, w: nw, h: nh, pixelSize: pixelSize });
+    }
+
+    /**
+     * Outil NUMBER - Dessine un badge numéroté
+     * @param {CanvasRenderingContext2D} ctx - Contexte canvas
+     * @param {number} x - Position X (centre)
+     * @param {number} y - Position Y (centre)
+     * @param {number} num - Numéro à afficher
+     * @param {string} color - Couleur du badge
+     */
+    function drawNumberBadge(ctx, x, y, num, color) {
+        var radius = 16;
+        color = color || '#ff0000';
+
+        // Cercle de fond
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        // Bordure blanche
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Numéro
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(num), x, y);
+
+        sxcLog("DEBUG", "Number badge drawn:", { x: x, y: y, num: num });
+    }
+
+    /**
+     * Outil HIGHLIGHT - Dessine un rectangle surligné semi-transparent
+     * @param {CanvasRenderingContext2D} ctx - Contexte canvas
+     * @param {number} x - Position X
+     * @param {number} y - Position Y
+     * @param {number} w - Largeur
+     * @param {number} h - Hauteur
+     * @param {string} color - Couleur (défaut jaune)
+     * @param {number} opacity - Opacité (0-1)
+     */
+    function drawHighlight(ctx, x, y, w, h, color, opacity) {
+        color = color || '#FFFF00';
+        opacity = opacity !== undefined ? opacity : sxcState.highlightOpacity;
+
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, w, h);
+        ctx.restore();
+
+        sxcLog("DEBUG", "Highlight drawn:", { x: x, y: y, w: w, h: h });
+    }
+
+    /**
+     * Outil SPOTLIGHT - Dessine un overlay sombre avec zone transparente
+     * Note: Le spotlight est appliqué lors de l'export, pas en temps réel
+     * @param {CanvasRenderingContext2D} ctx - Contexte canvas
+     * @param {number} x - Position X de la zone éclairée
+     * @param {number} y - Position Y de la zone éclairée
+     * @param {number} w - Largeur de la zone éclairée
+     * @param {number} h - Hauteur de la zone éclairée
+     * @param {number} canvasWidth - Largeur totale du canvas
+     * @param {number} canvasHeight - Hauteur totale du canvas
+     */
+    function drawSpotlight(ctx, x, y, w, h, canvasWidth, canvasHeight) {
+        // Normaliser les coordonnées
+        var nx = w < 0 ? x + w : x;
+        var ny = h < 0 ? y + h : y;
+        var nw = Math.abs(w);
+        var nh = Math.abs(h);
+
+        ctx.save();
+
+        // Dessiner l'overlay sombre sur tout le canvas
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        // Découper la zone spotlight (la rendre transparente)
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+        ctx.fillRect(nx, ny, nw, nh);
+
+        ctx.restore();
+
+        sxcLog("DEBUG", "Spotlight applied:", { x: nx, y: ny, w: nw, h: nh });
+    }
+
     function saveAnnotation(type, data) {
         if (sxcState.simpleCanvas) {
-            sxcState.simpleCanvas.annotations.push({ type: type, data: data });
+            // Récupérer la couleur et l'épaisseur actuelles
+            var colorPicker = document.getElementById('sxc-color-picker');
+            var strokeWidth = document.getElementById('sxc-stroke-width');
+
+            sxcState.simpleCanvas.annotations.push({
+                type: type,
+                data: data,
+                color: colorPicker ? colorPicker.value : '#ff0000',
+                lineWidth: strokeWidth ? parseInt(strokeWidth.value) : 3
+            });
         }
     }
 
@@ -1056,7 +1450,21 @@
                     drawEllipse(ctx, ann.data.x, ann.data.y, ann.data.w, ann.data.h);
                     break;
                 case 'text':
+                    ctx.font = (ann.data.fontSize || 16) + 'px Arial';
                     ctx.fillText(ann.data.text, ann.data.x, ann.data.y);
+                    break;
+                case 'number':
+                    drawNumberBadge(ctx, ann.data.x, ann.data.y, ann.data.num, ann.color);
+                    break;
+                case 'blur':
+                    // Réappliquer le blur sur la zone
+                    drawBlur(ctx, ann.data.x, ann.data.y, ann.data.w, ann.data.h, ann.data.pixelSize);
+                    break;
+                case 'highlight':
+                    drawHighlight(ctx, ann.data.x, ann.data.y, ann.data.w, ann.data.h, '#FFFF00', sxcState.highlightOpacity);
+                    break;
+                case 'spotlight':
+                    drawSpotlight(ctx, ann.data.x, ann.data.y, ann.data.w, ann.data.h, state.width, state.height);
                     break;
             }
         });
@@ -1078,42 +1486,130 @@
         sxcLog("DEBUG", "Inserting edited image...");
 
         var dataUrl;
+        var canvasElement = null;
 
         if (sxcState.fabricCanvas) {
+            // Fabric.js - exporter directement
             dataUrl = sxcState.fabricCanvas.toDataURL({
                 format: sxcState.captureFormat,
                 quality: sxcState.captureQuality
             });
+            sxcLog("DEBUG", "Export from Fabric canvas");
         } else if (sxcState.simpleCanvas) {
-            dataUrl = sxcState.simpleCanvas.element.toDataURL(
+            // Canvas simple - s'assurer que les annotations sont dessinées
+            redrawSimpleCanvasForExport();
+            canvasElement = sxcState.simpleCanvas.element;
+            dataUrl = canvasElement.toDataURL(
                 'image/' + sxcState.captureFormat,
                 sxcState.captureQuality
             );
+            sxcLog("DEBUG", "Export from simple canvas with", sxcState.simpleCanvas.annotations.length, "annotations");
         } else if (sxcState.capturedImage) {
             dataUrl = sxcState.capturedImage.toDataURL(
                 'image/' + sxcState.captureFormat,
                 sxcState.captureQuality
             );
+            sxcLog("DEBUG", "Export from captured image");
         } else {
-            showNotification("Aucune image a inserer", "error");
+            showNotification("Aucune image à insérer", "error");
             return;
         }
 
-        // Creer le HTML de l'image
+        // TOUJOURS copier dans le presse-papiers d'abord (avec le canvas si disponible)
+        if (canvasElement) {
+            copyCanvasToClipboard(canvasElement);
+        } else {
+            copyToClipboard(dataUrl);
+        }
+        sxcLog("DEBUG", "Image copiée dans le presse-papiers");
+
+        // Créer le HTML de l'image
         var imgHtml = '<img src="' + dataUrl + '" alt="Screenshot" style="max-width:100%; border:1px solid #ddd; margin:5px 0;" />';
 
-        // Inserer dans l'editeur
+        // Essayer d'insérer dans l'éditeur
         var success = insertHtmlToEditor(sxcState.currentEditor, imgHtml);
 
         if (success) {
-            showNotification("Image inseree avec succes!", "success");
-            closeImageEditor();
+            showNotification("Image insérée et copiée dans le presse-papiers (Ctrl+V)", "success");
         } else {
-            // Fallback: copier dans le presse-papiers
-            copyToClipboard(dataUrl);
-            showNotification("Image copiee dans le presse-papiers. Collez avec Ctrl+V", "info");
-            closeImageEditor();
+            showNotification("Image copiée dans le presse-papiers. Collez avec Ctrl+V", "info");
         }
+        closeImageEditor();
+    }
+
+    /**
+     * Redessine le canvas simple avec TOUTES les annotations pour l'export
+     */
+    function redrawSimpleCanvasForExport() {
+        var state = sxcState.simpleCanvas;
+        if (!state) return;
+
+        var ctx = state.context;
+
+        // Effacer et redessiner l'image source
+        ctx.clearRect(0, 0, state.width, state.height);
+        ctx.drawImage(state.sourceCanvas, 0, 0, state.width, state.height);
+
+        // Redessiner TOUTES les annotations avec leurs couleurs originales
+        state.annotations.forEach(function(ann) {
+            // Utiliser la couleur et l'épaisseur de l'annotation
+            ctx.strokeStyle = ann.color || '#ff0000';
+            ctx.fillStyle = ann.color || '#ff0000';
+            ctx.lineWidth = ann.lineWidth || 3;
+
+            switch (ann.type) {
+                case 'line':
+                    ctx.beginPath();
+                    ctx.moveTo(ann.data.x1, ann.data.y1);
+                    ctx.lineTo(ann.data.x2, ann.data.y2);
+                    ctx.stroke();
+                    break;
+                case 'arrow':
+                    drawArrow(ctx, ann.data.x1, ann.data.y1, ann.data.x2, ann.data.y2);
+                    break;
+                case 'rect':
+                    ctx.strokeRect(ann.data.x, ann.data.y, ann.data.w, ann.data.h);
+                    break;
+                case 'ellipse':
+                    drawEllipse(ctx, ann.data.x, ann.data.y, ann.data.w, ann.data.h);
+                    break;
+                case 'text':
+                    ctx.font = (ann.data.fontSize || 16) + 'px Arial';
+                    ctx.fillText(ann.data.text, ann.data.x, ann.data.y);
+                    break;
+                case 'number':
+                    drawNumberBadge(ctx, ann.data.x, ann.data.y, ann.data.num, ann.color);
+                    break;
+                case 'blur':
+                    drawBlur(ctx, ann.data.x, ann.data.y, ann.data.w, ann.data.h, ann.data.pixelSize);
+                    break;
+                case 'highlight':
+                    drawHighlight(ctx, ann.data.x, ann.data.y, ann.data.w, ann.data.h, '#FFFF00', sxcState.highlightOpacity);
+                    break;
+                case 'spotlight':
+                    drawSpotlight(ctx, ann.data.x, ann.data.y, ann.data.w, ann.data.h, state.width, state.height);
+                    break;
+            }
+        });
+
+        sxcLog("DEBUG", "Canvas redrawn for export with", state.annotations.length, "annotations");
+    }
+
+    /**
+     * Copie un canvas directement dans le presse-papiers
+     */
+    function copyCanvasToClipboard(canvas) {
+        canvas.toBlob(function(blob) {
+            if (blob && navigator.clipboard && navigator.clipboard.write) {
+                navigator.clipboard.write([
+                    new ClipboardItem({ 'image/png': blob })
+                ]).then(function() {
+                    sxcLog("DEBUG", "Canvas copied to clipboard successfully");
+                }).catch(function(err) {
+                    sxcLog("ERROR", "Clipboard write failed", err);
+                });
+            }
+        }, 'image/png');
     }
 
     function copyToClipboard(dataUrl) {

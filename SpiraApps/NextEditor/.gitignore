@@ -1,0 +1,53 @@
+# NextEditor .gitignore
+
+# ============================================================
+# DEPENDENCIES - Do not commit (download with download-tinymce.ps1)
+# ============================================================
+libs/
+
+# ============================================================
+# BUILD ARTIFACTS
+# ============================================================
+# Compiled bundle (regenerate with build-optimized.ps1)
+nexteditor.js
+
+# Package files (large, regenerate with build)
+*.spiraapp
+
+# ============================================================
+# DEVELOPMENT
+# ============================================================
+# Node modules (if using npm for tooling)
+node_modules/
+
+# Temp files
+*.tmp
+*.temp
+*.log
+
+# Editor backups
+*~
+*.bak
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.suo
+*.user
+
+# ============================================================
+# KEEP THESE (explicitly)
+# ============================================================
+!manifest.yaml
+!src/
+!test.html
+!PROMPT.md
+!*.ps1
+!*.bat
+!*.md

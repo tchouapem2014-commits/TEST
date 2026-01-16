@@ -1,146 +1,101 @@
-# Ralph Wiggum Prompt - SpiraXCapture
+# Ralph Wiggum Prompt - SpiraXCapture v2.0 Modernization
 
-## Objectif
+## Mission
 
-Developper une SpiraApp complete appellee "SpiraXCapture" pour capturer des screenshots et les attacher aux artefacts SpiraPlan.
+Moderniser SpiraXCapture en ajoutant des fonctionnalites d'annotation avancees inspirees de Shottr, Snagit et CleanShot X.
 
 ## Criteres de Completion
 
-1. `manifest.yaml` valide avec tous les settings necessaires
-2. `capture.js` sans erreurs de syntaxe
-3. `README.md` documentation complete
-4. `SPEC.md` specifications techniques
-5. Package `.spiraapp` genere avec succes (via spiraapp-package-generator)
+Dites `<promise>COMPLETE</promise>` UNIQUEMENT quand TOUS ces criteres sont remplis:
 
-## Specifications Fonctionnelles
+1. [ ] Outil **Blur/Pixelate** fonctionnel (flouter zones sensibles)
+2. [ ] Outil **Numerotation sequentielle** (badges 1, 2, 3...)
+3. [ ] Outil **Spotlight** (surbrillance zone, assombrissement reste)
+4. [ ] Outil **Highlight/Marker** (surligneur jaune semi-transparent)
+5. [ ] **Toolbar modernisee** avec icones claires
+6. [ ] **Raccourcis clavier** (B=blur, N=numero, H=highlight, S=spotlight)
+7. [ ] `manifest.yaml` valide
+8. [ ] `capture.js` sans erreurs de syntaxe
+9. [ ] Package `.spiraapp` genere avec succes
 
-### Fonctionnalites Principales
+## Specifications Techniques
 
-1. **Bouton de capture d'ecran** dans la toolbar des pages de detail
-2. **Capture de la zone visible** du navigateur
-3. **Apercu de l'image** avant upload
-4. **Upload automatique** comme piece jointe a l'artefact courant
-5. **Notification de succes/erreur**
-
-### Pages Cibles (pageId)
-
-- 9: RequirementDetails
-- 10: TestCaseDetails
-- 11: TestSetDetails
-- 14: IncidentDetails (bugs)
-- 15: TaskDetails
-- 16: ReleaseDetails
-
-### Settings Produit
-
-1. `capture_quality` (String): Qualite JPEG 0.1-1.0 (defaut: 0.8)
-2. `capture_format` (String): Format image - png ou jpeg (defaut: png)
-3. `auto_timestamp` (Boolean): Ajouter timestamp au nom du fichier
-4. `debug_mode` (Boolean): Mode debug console
-
-### API SpiraApp a Utiliser
-
-- `registerEvent_menuEntryClick`: Handler bouton menu
-- `displaySuccessMessage`: Notification succes
-- `displayErrorMessage`: Notification erreur
-- `executeApi`: Appel REST API pour upload
-- `spiraAppManager.artifactId`: ID artefact courant
-- `spiraAppManager.artifactTypeId`: Type artefact courant
-
-### Logique de Capture
+### Nouveaux Outils a Implementer
 
 ```javascript
-// Pseudo-code
-1. Clic sur bouton "Capturer"
-2. Utiliser html2canvas ou API native pour capturer
-3. Convertir en blob (PNG ou JPEG selon config)
-4. Generer nom fichier avec timestamp si active
-5. Appeler API REST POST /documents pour uploader
-6. Lier le document a l'artefact courant
-7. Afficher notification succes/erreur
+// BLUR TOOL (B)
+// - Dessiner rectangle sur zone a flouter
+// - Appliquer filtre blur CSS ou canvas pixelisation
+// - Taille pixel configurable (8x8, 16x16, 32x32)
+
+// STEP COUNTER TOOL (N)
+// - Clic = ajouter badge numero
+// - Cercle colore avec numero auto-incremente
+// - Couleur configurable
+
+// SPOTLIGHT TOOL (S)
+// - Dessiner rectangle ou ellipse
+// - Zone selectionnee = 100% opacite
+// - Reste de l'image = overlay sombre 50%
+
+// HIGHLIGHT TOOL (H)
+// - Dessiner rectangle semi-transparent
+// - Couleur jaune par defaut (#FFFF00, 40% opacite)
+// - Comme un surligneur
 ```
 
-### Structure du Manifest
+### Structure Toolbar Modernisee
 
-```yaml
-guid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-name: "SpiraXCapture"
-caption: "SpiraX Capture"
-summary: "Capture screenshots and attach to artifacts"
-version: "1.0"
-
-productSettings:
-  - name: capture_quality
-    settingTypeId: 1
-    caption: "Qualite capture (0.1-1.0)"
-    position: 1
-    placeholder: "0.8"
-
-  - name: capture_format
-    settingTypeId: 1
-    caption: "Format (png/jpeg)"
-    position: 2
-    placeholder: "png"
-
-  - name: auto_timestamp
-    settingTypeId: 10
-    caption: "Ajouter timestamp au nom"
-    position: 3
-
-  - name: debug_mode
-    settingTypeId: 10
-    caption: "Mode debug"
-    position: 4
-
-pageContents:
-  - pageId: 9
-    name: "capture"
-    code: "file://capture.js"
-  - pageId: 10
-    name: "capture"
-    code: "file://capture.js"
-  # ... autres pages
-
-menus:
-  - pageId: 9
-    caption: "SXC"
-    icon: "fa-solid fa-camera"
-    isActive: true
-    entries:
-      - name: "captureScreen"
-        caption: "Capturer Ecran"
-        tooltip: "Capture l'ecran et l'attache a l'artefact"
-        icon: "fa-solid fa-camera-retro"
-        isActive: true
-        actionTypeId: 2
-        action: "captureScreen"
 ```
+[Undo][Redo] | [Select][Arrow][Rect][Ellipse][Line][Text] | [Blur][Number][Spotlight][Highlight] | [Color][Size]
+```
+
+### Raccourcis Clavier
+
+| Touche | Action |
+|--------|--------|
+| V | Select/Move |
+| A | Arrow |
+| R | Rectangle |
+| E | Ellipse |
+| L | Line |
+| T | Text |
+| B | Blur/Pixelate |
+| N | Number/Step |
+| S | Spotlight |
+| H | Highlight |
+| Z | Undo |
+| Delete | Supprimer selection |
 
 ## Contraintes
 
-- Utiliser les APIs SpiraApp documentees uniquement
-- Pas de dependances externes (html2canvas peut etre inclus inline ou utiliser API native)
+- JavaScript ES5 (pas de const/let, pas de arrow functions)
+- Pas de dependances externes (tout en inline)
 - Compatible SpiraPlan v7.0+
-- Code JavaScript ES5 pour compatibilite navigateur
+- Code minifiable par spiraapp-package-generator
 
-## Fichiers a Creer
+## Fichiers a Modifier
 
-1. `manifest.yaml` - Configuration SpiraApp
-2. `capture.js` - Code principal
-3. `README.md` - Documentation utilisateur
-4. `SPEC.md` - Specifications techniques
+1. `capture.js` - Ajouter les nouveaux outils
+2. `manifest.yaml` - Mettre a jour version si necessaire
 
-## Verification
+## Verification a Chaque Iteration
 
-A chaque iteration:
-1. Verifier la syntaxe YAML du manifest
-2. Verifier la syntaxe JavaScript
-3. S'assurer que toutes les pages ont leurs menus
-4. Valider la structure des settings
+1. Verifier syntaxe JavaScript (pas d'erreurs)
+2. Tester que les outils existants fonctionnent toujours
+3. S'assurer que les nouveaux outils sont accessibles dans la toolbar
 
-## Notes Importantes
+## Notes
 
-- Le GUID doit etre unique (different de RTI)
-- Les positions des settings commencent a 1
-- actionTypeId: 2 = appel fonction JavaScript
-- Inclure les logs console pour debug
+- Garder le code existant fonctionnel (ne pas casser ce qui marche)
+- Ajouter des logs console pour debug ([SXC] prefix)
+- Les annotations doivent etre sauvegardees avec couleur/style
+
+## Etat Actuel
+
+- Outils existants: Select, Arrow, Rectangle, Ellipse, Line, Text, Draw
+- A ajouter: Blur, Number, Spotlight, Highlight
+- Copie presse-papiers: Fonctionnelle
+- Insertion editeur: En cours d'amelioration
+
+Quand TOUS les criteres sont valides, repondez: `<promise>COMPLETE</promise>`

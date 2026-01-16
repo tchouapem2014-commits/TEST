@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NextEditor - Test Page</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #0066cc;
+            border-bottom: 2px solid #0066cc;
+            padding-bottom: 10px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #0066cc;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0052a3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #1e7e34;
+        }
+
+        /* Fake RadEditor for testing */
+        .fake-radeditor {
+            border: 2px solid #cc0000;
+            border-radius: 4px;
+            margin: 10px 0;
+            position: relative;
+        }
+        .fake-radeditor::before {
+            content: "Simulated RadEditor";
+            position: absolute;
+            top: -12px;
+            left: 10px;
+            background: #cc0000;
+            color: white;
+            padding: 2px 8px;
+            font-size: 11px;
+            border-radius: 3px;
+        }
+        .RadEditor {
+            padding: 10px;
+            padding-top: 20px;
+        }
+        .reToolbar {
+            background: linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 100%);
+            padding: 5px;
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .reTool {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            margin: 1px;
+            padding: 3px;
+            border: 1px solid #999;
+            border-radius: 3px;
+            background: linear-gradient(180deg, #fff 0%, #e8e8e8 100%);
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .reContentCell {
+            min-height: 150px;
+            padding: 10px;
+            background: white;
+        }
+        .reContentCell textarea {
+            width: 100%;
+            min-height: 120px;
+            border: 1px solid #ccc;
+            padding: 8px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        /* Status indicator */
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-pending { background: #fff3cd; color: #856404; }
+
+        /* Console log display */
+        #console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #console-output .log-entry {
+            margin: 2px 0;
+            padding: 2px 0;
+            border-bottom: 1px solid #333;
+        }
+        #console-output .log-debug { color: #9cdcfe; }
+        #console-output .log-error { color: #f48771; }
+        #console-output .log-info { color: #dcdcaa; }
+
+        /* Info box */
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #0066cc;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        .info-box code {
+            background: #d4e5f7;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>NextEditor - Test Page</h1>
+        <p class="subtitle">Test TinyMCE integration for SpiraPlan RichText replacement</p>
+
+        <!-- Status Section -->
+        <div class="test-section">
+            <h2>Library Status</h2>
+            <p>
+                <strong>TinyMCE:</strong>
+                <span id="status-tinymce" class="status status-pending">Checking...</span>
+            </p>
+            <p>
+                <strong>NEXTEDITOR:</strong>
+                <span id="status-nexteditor" class="status status-pending">Checking...</span>
+            </p>
+        </div>
+
+        <!-- Controls Section -->
+        <div class="test-section">
+            <h2>Test Controls</h2>
+            <div class="info-box">
+                <strong>Instructions:</strong> Click "Replace All Editors" to test the RadEditor replacement.
+                The simulated RadEditor below should be replaced with TinyMCE.
+            </div>
+            <button class="btn btn-primary" onclick="testReplaceAll()">Replace All Editors</button>
+            <button class="btn btn-secondary" onclick="testGetState()">Get State</button>
+            <button class="btn btn-success" onclick="checkStatus()">Refresh Status</button>
+        </div>
+
+        <!-- Simulated RadEditor 1 -->
+        <div class="test-section">
+            <h2>Simulated RadEditor - Description Field</h2>
+            <div class="fake-radeditor">
+                <div class="RadEditor" id="RadEditor_Description">
+                    <div class="reToolbar">
+                        <button class="reTool" title="Bold"><b>B</b></button>
+                        <button class="reTool" title="Italic"><i>I</i></button>
+                        <button class="reTool" title="Underline"><u>U</u></button>
+                        <span style="width:1px;height:20px;background:#ccc;margin:0 5px;"></span>
+                        <button class="reTool" title="List">&#8226;</button>
+                        <button class="reTool" title="Link">&#128279;</button>
+                    </div>
+                    <div class="reContentCell">
+                        <textarea id="txtDescription" name="Description">
+<h2>Sample Content</h2>
+<p>This is a <strong>sample</strong> RichText content that simulates what SpiraPlan stores.</p>
+<table border="1" cellpadding="5">
+    <tr>
+        <th>Column 1</th>
+        <th>Column 2</th>
+        <th>Column 3</th>
+    </tr>
+    <tr>
+        <td>Data 1</td>
+        <td>Data 2</td>
+        <td>Data 3</td>
+    </tr>
+    <tr>
+        <td>Data 4</td>
+        <td>Data 5</td>
+        <td>Data 6</td>
+    </tr>
+</table>
+<p>Try editing this with TinyMCE!</p>
+                        </textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Simulated RadEditor 2 -->
+        <div class="test-section">
+            <h2>Simulated RadEditor - Notes Field</h2>
+            <div class="fake-radeditor">
+                <div class="RadEditor" id="RadEditor_Notes">
+                    <div class="reToolbar">
+                        <button class="reTool" title="Bold"><b>B</b></button>
+                        <button class="reTool" title="Italic"><i>I</i></button>
+                    </div>
+                    <div class="reContentCell">
+                        <textarea id="txtNotes" name="Notes">
+<p>These are additional notes.</p>
+<ul>
+    <li>Item 1</li>
+    <li>Item 2</li>
+    <li>Item 3</li>
+</ul>
+                        </textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Console Output -->
+        <div class="test-section">
+            <h2>Console Output</h2>
+            <button class="btn btn-secondary" onclick="clearConsole()" style="margin-bottom:10px">Clear</button>
+            <div id="console-output">
+                <div class="log-entry log-info">Console initialized. Waiting for NextEditor logs...</div>
+            </div>
+        </div>
+
+        <!-- API Test Section -->
+        <div class="test-section">
+            <h2>API Reference</h2>
+            <div class="info-box">
+                <p>Test the NEXTEDITOR global API:</p>
+                <ul>
+                    <li><code>NEXTEDITOR.version</code> - Get version</li>
+                    <li><code>NEXTEDITOR.init()</code> - Initialize</li>
+                    <li><code>NEXTEDITOR.replaceAll()</code> - Replace all RadEditors</li>
+                    <li><code>NEXTEDITOR.getState()</code> - Get internal state</li>
+                    <li><code>NEXTEDITOR.toggle(index)</code> - Toggle editor at index</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load NextEditor with embedded TinyMCE -->
+    <script src="nexteditor.js"></script>
+
+    <!-- For testing without embedded TinyMCE, use CDN fallback -->
+    <script>
+        if (typeof tinymce === 'undefined') {
+            console.log('[Test] TinyMCE not embedded, loading from CDN...');
+            var script = document.createElement('script');
+            script.src = 'https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js';
+            script.referrerPolicy = 'origin';
+            script.onload = function() {
+                console.log('[Test] TinyMCE loaded from CDN');
+                checkStatus();
+            };
+            document.head.appendChild(script);
+        }
+    </script>
+
+    <script>
+        // Override console.log to capture NextEditor logs
+        var originalLog = console.log;
+        console.log = function() {
+            var args = Array.prototype.slice.call(arguments);
+            var message = args.map(function(arg) {
+                if (typeof arg === 'object') {
+                    try {
+                        return JSON.stringify(arg, null, 2);
+                    } catch(e) {
+                        return String(arg);
+                    }
+                }
+                return String(arg);
+            }).join(' ');
+
+            // Check if it's a NextEditor log
+            if (message.indexOf('[NextEditor]') !== -1) {
+                addToConsole(message);
+            }
+
+            // Call original
+            originalLog.apply(console, arguments);
+        };
+
+        function addToConsole(message) {
+            var output = document.getElementById('console-output');
+            var entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            if (message.indexOf('ERROR') !== -1) {
+                entry.className += ' log-error';
+            } else if (message.indexOf('DEBUG') !== -1) {
+                entry.className += ' log-debug';
+            } else {
+                entry.className += ' log-info';
+            }
+
+            entry.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+            output.appendChild(entry);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearConsole() {
+            var output = document.getElementById('console-output');
+            output.innerHTML = '<div class="log-entry log-info">Console cleared.</div>';
+        }
+
+        function setStatus(id, success, text) {
+            var el = document.getElementById(id);
+            el.className = 'status ' + (success ? 'status-success' : 'status-error');
+            el.textContent = text || (success ? 'Loaded' : 'Not Found');
+        }
+
+        function checkStatus() {
+            // Check TinyMCE
+            setStatus('status-tinymce', typeof tinymce !== 'undefined',
+                typeof tinymce !== 'undefined' ? 'v' + tinymce.majorVersion + '.' + tinymce.minorVersion : 'Not Found');
+
+            // Check NEXTEDITOR
+            setStatus('status-nexteditor', typeof NEXTEDITOR !== 'undefined',
+                typeof NEXTEDITOR !== 'undefined' ? 'v' + NEXTEDITOR.version : 'Not Found');
+        }
+
+        function testReplaceAll() {
+            if (typeof NEXTEDITOR !== 'undefined') {
+                addToConsole('[Test] Calling NEXTEDITOR.replaceAll()');
+                NEXTEDITOR.replaceAll();
+            } else {
+                addToConsole('[Test] ERROR: NEXTEDITOR not loaded!');
+                alert('NEXTEDITOR is not loaded. Check the console for errors.');
+            }
+        }
+
+        function testGetState() {
+            if (typeof NEXTEDITOR !== 'undefined') {
+                var state = NEXTEDITOR.getState();
+                addToConsole('[Test] NEXTEDITOR.getState() = ' + JSON.stringify(state, null, 2));
+                console.log('NEXTEDITOR State:', state);
+            } else {
+                addToConsole('[Test] ERROR: NEXTEDITOR not loaded!');
+            }
+        }
+
+        // Mock spiraAppManager for testing
+        // Simulates SpiraPlan's dual-level settings system
+        window.spiraAppManager = {
+            // PRODUCT-LEVEL SETTINGS (per-product configuration)
+            getProductSetting: function(name) {
+                var productSettings = {
+                    // Activation (position 1-5)
+                    'enable_tinymce': true,
+                    'activation_mode': 'auto',
+                    'allow_toggle': true,
+                    'debug_mode': true,
+                    'placeholder': '',
+
+                    // Editor Size (position 10-19)
+                    'editor_height': 400,
+                    'editor_width': '',
+                    'min_height': 200,
+                    'max_height': 800,
+                    'resize': 'vertical'
+                };
+                return productSettings[name];
+            },
+
+            // SYSTEM-LEVEL SETTINGS (global configuration)
+            getSystemSetting: function(name) {
+                var systemSettings = {
+                    // UI & Toolbar (position 1-19)
+                    'show_menubar': false,
+                    'menu_config': 'file edit view insert format table tools',
+                    'toolbar_config': 'full',
+                    'custom_toolbar': '',
+                    'toolbar_mode': 'wrap',
+                    'toolbar_sticky': false,
+                    'toolbar_sticky_offset': 0,
+                    'statusbar': true,
+                    'elementpath': true,
+                    'wordcount': true,
+                    'contextmenu': 'link image table',
+                    'quickbars_selection': '',
+                    'quickbars_insert': '',
+
+                    // Table Settings (position 20-39)
+                    'table_default_border': 1,
+                    'table_default_cell_padding': 5,
+                    'table_default_cell_spacing': 0,
+                    'table_default_styles': 'border-collapse: collapse; width: 100%;',
+                    'table_column_resizing': true,
+                    'table_resize_bars': true,
+                    'table_advtab': true,
+                    'table_cell_advtab': true,
+                    'table_row_advtab': true,
+                    'table_style_by_cell': false,
+                    'table_sizing_mode': 'relative',
+                    'table_clone_elements': 'strong em b i u',
+                    'table_header_type': 'section',
+                    'table_use_colgroups': false,
+                    'table_border_widths': '1px 2px 3px 4px 5px',
+                    'table_border_styles': 'solid dashed dotted double groove ridge',
+
+                    // Content Settings (position 40-59)
+                    'content_font_family': 'Arial, Helvetica, sans-serif',
+                    'content_font_size': '12px',
+                    'content_line_height': '1.4',
+                    'font_family_formats': 'Arial=arial,helvetica,sans-serif;Courier New=courier new,courier,monospace;Georgia=georgia,palatino,serif;Tahoma=tahoma,arial,helvetica,sans-serif;Times New Roman=times new roman,times,serif;Verdana=verdana,geneva,sans-serif',
+                    'font_size_formats': '8pt 10pt 11pt 12pt 14pt 18pt 24pt 36pt',
+                    'line_height_formats': '1 1.2 1.4 1.6 2',
+                    'paste_as_text': false,
+                    'paste_remove_styles': false,
+                    'paste_remove_spans': false,
+                    'smart_paste': true,
+                    'invalid_elements': 'script,object,embed,applet',
+                    'extended_valid_elements': 'span[*],div[*],p[*],a[*],img[*],table[*],tr[*],td[*],th[*]',
+                    'entity_encoding': 'named',
+
+                    // Image Settings (position 60-69)
+                    'allow_images': true,
+                    'image_advtab': true,
+                    'image_caption': true,
+                    'image_description': true,
+                    'image_title': true,
+                    'image_dimensions': true,
+                    'image_upload_url': '',
+
+                    // Link Settings (position 70-79)
+                    'allow_links': true,
+                    'link_default_target': '_self',
+                    'link_default_protocol': 'https',
+                    'link_assume_external_targets': true,
+                    'link_context_toolbar': true,
+                    'link_quicklink': true,
+                    'link_title': true,
+
+                    // Plugin Settings (position 80-99)
+                    'allow_code_view': true,
+                    'plugin_fullscreen': true,
+                    'plugin_searchreplace': true,
+                    'plugin_wordcount': true,
+                    'plugin_charmap': true,
+                    'plugin_emoticons': false,
+                    'plugin_insertdatetime': true,
+                    'plugin_preview': false,
+                    'plugin_anchor': true,
+                    'plugin_visualblocks': true,
+                    'plugin_visualchars': false,
+                    'plugin_pagebreak': false,
+                    'plugin_nonbreaking': true,
+                    'plugin_codesample': false,
+                    'plugin_directionality': false,
+                    'plugin_help': false,
+                    'plugin_math_equations': true,
+                    'enable_numbered_headings': true,
+                    'plugin_autosave': true,
+                    'autosave_interval': 30,
+                    'plugin_accordion': true,
+                    'plugin_media': true,
+
+                    // Page Format / Word Export (position 100-109)
+                    'page_mode_enabled': true,
+                    'page_format': 'A4',
+                    'page_orientation': 'portrait',
+                    'page_margin_top': 20,
+                    'page_margin_bottom': 20,
+                    'page_margin_left': 10,
+                    'page_margin_right': 10,
+                    'page_show_breaks': true,
+                    'page_zoom': 100,
+                    'page_zoom_controls': true
+                };
+                return systemSettings[name];
+            }
+        };
+
+        // Check status on load
+        window.addEventListener('load', function() {
+            setTimeout(checkStatus, 1000);
+            addToConsole('[Test] Page loaded. Checking library status...');
+        });
+    </script>
+</body>
+</html>

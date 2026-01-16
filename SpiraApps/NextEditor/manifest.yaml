@@ -1,0 +1,783 @@
+# ============================================================
+# NextEditor - TinyMCE RichText Editor for SpiraPlan
+# ============================================================
+# Replaces RadEditor with TinyMCE for superior table editing
+# Version: 1.0
+# ============================================================
+
+guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+name: NextEditor
+caption: NextEditor - Advanced RichText
+summary: Replaces RadEditor with TinyMCE for superior table editing and formatting.
+description: >-
+  NextEditor replaces SpiraPlan's default RadEditor with TinyMCE,
+  providing superior table editing capabilities including cell merge,
+  split, borders, colors, and professional formatting. All RichText
+  fields are automatically upgraded with the modern TinyMCE interface.
+productSummary: Advanced RichText editor with TinyMCE
+productDescription: >-
+  Replace RadEditor with TinyMCE for better table support. Features include
+  cell merge/split, table borders, cell colors, row/column operations,
+  and a modern editing interface. Seamlessly integrates with SpiraPlan's
+  save workflow.
+version: 1.0
+author: SpiraApps Developer
+license: MIT
+copyright: Copyright 2026
+url: https://github.com/spiraapps/nexteditor
+
+# ============================================================
+# SYSTEM SETTINGS (Global - shared across all products)
+# ============================================================
+# These settings configure the editor appearance, plugins,
+# and default behaviors for the entire SpiraPlan instance.
+# ============================================================
+
+settings:
+
+  # ==========================================
+  # 1. UI & TOOLBAR (position 1-19)
+  # ==========================================
+
+  # 1.1 Menubar
+  - settingTypeId: 10
+    name: show_menubar
+    caption: Show Menu Bar
+    position: 1
+    tooltip: >-
+      Show the menu bar (File, Edit, View, Insert, Format, Tools, Table).
+
+  - settingTypeId: 1
+    name: menubar_items
+    caption: Menu Bar Items
+    position: 2
+    placeholder: "file edit view insert format tools table"
+    tooltip: >-
+      Space-separated list of menus to show.
+      Available: file edit view insert format tools table help
+
+  # 1.2 Toolbar
+  - settingTypeId: 1
+    name: toolbar_config
+    caption: Toolbar Configuration
+    position: 3
+    placeholder: "standard"
+    tooltip: >-
+      minimal = Basic formatting (bold, italic, lists).
+      standard = Common tools + table.
+      full = All tools including advanced table.
+      custom = Use Custom Toolbar setting.
+
+  - settingTypeId: 1
+    name: custom_toolbar
+    caption: Custom Toolbar
+    position: 4
+    placeholder: ""
+    tooltip: >-
+      Custom toolbar definition. Use | to separate groups.
+      Example: undo redo | bold italic | bullist numlist | table
+
+  - settingTypeId: 1
+    name: toolbar_mode
+    caption: Toolbar Mode
+    position: 5
+    placeholder: "wrap"
+    tooltip: >-
+      How to handle toolbar overflow:
+      wrap = Wrap to next line (like RadEditor).
+      floating = Show overflow in dropdown.
+      sliding = Slide to reveal.
+      scrolling = Horizontal scroll.
+
+  - settingTypeId: 1
+    name: toolbar_location
+    caption: Toolbar Location
+    position: 6
+    placeholder: "top"
+    tooltip: >-
+      top = Above content (default, like RadEditor).
+      bottom = Below content.
+      auto = Automatic based on space.
+
+  - settingTypeId: 10
+    name: toolbar_sticky
+    caption: Sticky Toolbar
+    position: 7
+    tooltip: Keep toolbar visible when scrolling long content.
+
+  # 1.3 Statusbar
+  - settingTypeId: 10
+    name: show_statusbar
+    caption: Show Status Bar
+    position: 8
+    tooltip: Show the status bar at the bottom of the editor.
+
+  - settingTypeId: 10
+    name: show_wordcount
+    caption: Show Word Count
+    position: 9
+    tooltip: Display word count in status bar.
+
+  - settingTypeId: 10
+    name: show_path
+    caption: Show Element Path
+    position: 10
+    tooltip: Show HTML element path in status bar.
+
+  # 1.4 Context Menu & Appearance
+  - settingTypeId: 1
+    name: contextmenu
+    caption: Context Menu Items
+    position: 11
+    placeholder: "link image table"
+    tooltip: >-
+      Items shown in right-click context menu.
+      Set empty to disable context menu.
+
+  - settingTypeId: 1
+    name: editor_skin
+    caption: Editor Theme
+    position: 12
+    placeholder: "oxide"
+    tooltip: >-
+      oxide = Light theme (matches SpiraPlan).
+      oxide-dark = Dark theme.
+
+  - settingTypeId: 10
+    name: highlight_on_focus
+    caption: Highlight on Focus
+    position: 13
+    tooltip: Add blue border when editor is focused.
+
+  # ==========================================
+  # 2. TABLE SETTINGS (position 20-39)
+  # ==========================================
+
+  # 2.1 Table Defaults
+  - settingTypeId: 4
+    name: table_default_border
+    caption: Default Table Border
+    position: 20
+    placeholder: "1"
+    tooltip: Border width for new tables (pixels).
+
+  - settingTypeId: 4
+    name: table_default_cellpadding
+    caption: Default Cell Padding
+    position: 21
+    placeholder: "5"
+    tooltip: Cell padding for new tables (pixels).
+
+  - settingTypeId: 4
+    name: table_default_cellspacing
+    caption: Default Cell Spacing
+    position: 22
+    placeholder: "0"
+    tooltip: Cell spacing for new tables (pixels).
+
+  - settingTypeId: 1
+    name: table_default_styles
+    caption: Default Table Styles
+    position: 23
+    placeholder: "border-collapse: collapse; width: 100%;"
+    tooltip: CSS styles applied to new tables.
+
+  # 2.2 Table Resizing
+  - settingTypeId: 10
+    name: table_column_resizing
+    caption: Enable Column Resizing
+    position: 24
+    tooltip: Allow resizing table columns by dragging borders.
+
+  - settingTypeId: 10
+    name: table_resize_bars
+    caption: Show Resize Bars
+    position: 25
+    tooltip: Show visual resize handles on table borders.
+
+  - settingTypeId: 1
+    name: table_sizing_mode
+    caption: Table Sizing Mode
+    position: 26
+    placeholder: "relative"
+    tooltip: >-
+      auto = Automatic sizing.
+      fixed = Pixel-based widths.
+      relative = Percentage-based widths (recommended).
+      responsive = No width attributes.
+
+  # 2.3 Table Dialogs
+  - settingTypeId: 10
+    name: table_advtab
+    caption: Table Advanced Tab
+    position: 27
+    tooltip: Show advanced tab in table properties dialog.
+
+  - settingTypeId: 10
+    name: table_cell_advtab
+    caption: Cell Advanced Tab
+    position: 28
+    tooltip: Show advanced tab in cell properties dialog.
+
+  - settingTypeId: 10
+    name: table_row_advtab
+    caption: Row Advanced Tab
+    position: 29
+    tooltip: Show advanced tab in row properties dialog.
+
+  - settingTypeId: 10
+    name: table_appearance_options
+    caption: Table Appearance Options
+    position: 30
+    tooltip: Show appearance options in table dialog.
+
+  # 2.4 Table Behavior
+  - settingTypeId: 10
+    name: table_tab_navigation
+    caption: Tab Navigation in Tables
+    position: 31
+    tooltip: Use Tab key to move between cells.
+
+  - settingTypeId: 1
+    name: table_header_type
+    caption: Table Header Type
+    position: 32
+    placeholder: "section"
+    tooltip: >-
+      section = Use thead element.
+      cells = Use th cells only.
+      sectionCells = Both thead and th.
+      auto = Automatic detection.
+
+  - settingTypeId: 1
+    name: table_toolbar
+    caption: Table Context Toolbar
+    position: 33
+    placeholder: "tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol | tablemergecells tablesplitcells"
+    tooltip: Buttons shown when clicking on a table.
+
+  # ==========================================
+  # 3. CONTENT SETTINGS (position 40-59)
+  # ==========================================
+
+  # 3.1 Typography
+  - settingTypeId: 1
+    name: content_font_family
+    caption: Default Font Family
+    position: 40
+    placeholder: "Arial, Helvetica, sans-serif"
+    tooltip: >-
+      Default font for content. Use Arial to match SpiraPlan.
+
+  - settingTypeId: 1
+    name: content_font_size
+    caption: Default Font Size
+    position: 41
+    placeholder: "12px"
+    tooltip: >-
+      Default font size. SpiraPlan typically uses 12px.
+
+  - settingTypeId: 1
+    name: font_family_formats
+    caption: Available Fonts
+    position: 42
+    placeholder: "Arial=arial; Courier New=courier new; Georgia=georgia; Times New Roman=times new roman; Verdana=verdana"
+    tooltip: >-
+      Font options in dropdown. Format: Name=css-value; ...
+
+  - settingTypeId: 1
+    name: font_size_formats
+    caption: Available Font Sizes
+    position: 43
+    placeholder: "8pt 10pt 12pt 14pt 16pt 18pt 24pt 36pt"
+    tooltip: Font size options in dropdown.
+
+  - settingTypeId: 1
+    name: line_height_formats
+    caption: Available Line Heights
+    position: 44
+    placeholder: "1 1.2 1.4 1.6 2"
+    tooltip: Line height options in dropdown.
+
+  # 3.2 Content Appearance
+  - settingTypeId: 10
+    name: visual_aids
+    caption: Show Visual Aids
+    position: 45
+    tooltip: >-
+      Show dotted borders on tables without visible borders,
+      and markers for anchors.
+
+  - settingTypeId: 1
+    name: content_style
+    caption: Custom Content CSS
+    position: 46
+    placeholder: ""
+    tooltip: >-
+      Additional CSS applied to editor content.
+      Example: p { margin: 0 0 10px 0; }
+
+  - settingTypeId: 1
+    name: block_formats
+    caption: Block Formats
+    position: 47
+    placeholder: "Paragraph=p; Heading 1=h1; Heading 2=h2; Heading 3=h3; Heading 4=h4"
+    tooltip: Block format options in dropdown.
+
+  # 3.3 Paste Behavior
+  - settingTypeId: 10
+    name: paste_as_text
+    caption: Paste as Plain Text
+    position: 48
+    tooltip: Strip all formatting when pasting.
+
+  - settingTypeId: 10
+    name: paste_merge_formats
+    caption: Merge Paste Formats
+    position: 49
+    tooltip: Merge similar formatting when pasting.
+
+  - settingTypeId: 10
+    name: smart_paste
+    caption: Smart Paste
+    position: 50
+    tooltip: >-
+      Automatically convert URLs to links and
+      embed media when pasting.
+
+  # 3.4 Spell Check
+  - settingTypeId: 10
+    name: browser_spellcheck
+    caption: Browser Spell Check
+    position: 51
+    tooltip: Use browser's built-in spell checker.
+
+  # ==========================================
+  # 4. IMAGE SETTINGS (position 60-69)
+  # ==========================================
+
+  - settingTypeId: 10
+    name: allow_images
+    caption: Allow Image Insertion
+    position: 60
+    tooltip: Enable image insertion in toolbar.
+
+  - settingTypeId: 10
+    name: image_advtab
+    caption: Image Advanced Tab
+    position: 61
+    tooltip: Show advanced tab in image dialog.
+
+  - settingTypeId: 10
+    name: image_caption
+    caption: Image Captions
+    position: 62
+    tooltip: Allow adding captions to images (figure/figcaption).
+
+  - settingTypeId: 10
+    name: image_description
+    caption: Image Description Field
+    position: 63
+    tooltip: Show alt text field in image dialog.
+
+  - settingTypeId: 10
+    name: image_dimensions
+    caption: Image Dimensions Fields
+    position: 64
+    tooltip: Show width/height fields in image dialog.
+
+  - settingTypeId: 10
+    name: image_title
+    caption: Image Title Field
+    position: 65
+    tooltip: Show title field in image dialog.
+
+  - settingTypeId: 10
+    name: resize_img_proportional
+    caption: Proportional Image Resize
+    position: 66
+    tooltip: Maintain aspect ratio when resizing images.
+
+  # ==========================================
+  # 5. LINK SETTINGS (position 70-79)
+  # ==========================================
+
+  - settingTypeId: 10
+    name: allow_links
+    caption: Allow Link Insertion
+    position: 70
+    tooltip: Enable link insertion in toolbar.
+
+  - settingTypeId: 1
+    name: link_default_target
+    caption: Default Link Target
+    position: 71
+    placeholder: ""
+    tooltip: >-
+      Default target for new links.
+      _blank = New window.
+      _self = Same window (default).
+
+  - settingTypeId: 1
+    name: link_default_protocol
+    caption: Default Link Protocol
+    position: 72
+    placeholder: "https"
+    tooltip: Protocol added to URLs without one.
+
+  - settingTypeId: 10
+    name: link_title
+    caption: Link Title Field
+    position: 73
+    tooltip: Show title field in link dialog.
+
+  - settingTypeId: 10
+    name: link_context_toolbar
+    caption: Link Context Toolbar
+    position: 74
+    tooltip: Show toolbar when cursor is in a link.
+
+  - settingTypeId: 1
+    name: link_rel_list
+    caption: Link Rel Options
+    position: 75
+    placeholder: ""
+    tooltip: >-
+      Available rel values as JSON array.
+      Example: [{"title":"No Referrer","value":"noreferrer"}]
+
+  - settingTypeId: 1
+    name: link_target_list
+    caption: Link Target Options
+    position: 76
+    placeholder: ""
+    tooltip: >-
+      Available target values as JSON array.
+      Leave empty for default options.
+
+  # ==========================================
+  # 6. PLUGIN SETTINGS (position 80-99)
+  # ==========================================
+
+  - settingTypeId: 10
+    name: allow_code_view
+    caption: Allow HTML Code View
+    position: 80
+    tooltip: Enable viewing/editing raw HTML source.
+
+  - settingTypeId: 10
+    name: plugin_fullscreen
+    caption: Enable Fullscreen
+    position: 81
+    tooltip: Allow editor to expand to full screen.
+
+  - settingTypeId: 10
+    name: plugin_searchreplace
+    caption: Enable Search & Replace
+    position: 82
+    tooltip: Enable find and replace functionality.
+
+  - settingTypeId: 10
+    name: plugin_wordcount
+    caption: Enable Word Count
+    position: 83
+    tooltip: Show word count in status bar.
+
+  - settingTypeId: 10
+    name: plugin_charmap
+    caption: Enable Special Characters
+    position: 84
+    tooltip: Allow inserting special characters.
+
+  - settingTypeId: 10
+    name: plugin_anchor
+    caption: Enable Anchors
+    position: 85
+    tooltip: Allow inserting named anchors/bookmarks.
+
+  - settingTypeId: 10
+    name: plugin_hr
+    caption: Enable Horizontal Rule
+    position: 86
+    tooltip: Allow inserting horizontal lines.
+
+  - settingTypeId: 10
+    name: plugin_visualblocks
+    caption: Enable Visual Blocks
+    position: 87
+    tooltip: Show block element outlines.
+
+  - settingTypeId: 10
+    name: plugin_preview
+    caption: Enable Preview
+    position: 88
+    tooltip: Allow previewing content.
+
+  - settingTypeId: 10
+    name: plugin_insertdatetime
+    caption: Enable Insert Date/Time
+    position: 89
+    tooltip: Allow inserting current date and time.
+
+  - settingTypeId: 10
+    name: plugin_nonbreaking
+    caption: Enable Non-Breaking Space
+    position: 90
+    tooltip: Allow inserting non-breaking spaces.
+
+  - settingTypeId: 10
+    name: plugin_autoresize
+    caption: Enable Auto Resize
+    position: 91
+    tooltip: Automatically resize editor to fit content.
+
+  - settingTypeId: 10
+    name: lists_indent_on_tab
+    caption: Indent Lists on Tab
+    position: 92
+    tooltip: Use Tab key to indent list items.
+
+  - settingTypeId: 10
+    name: plugin_math_equations
+    caption: Enable Math Equations
+    position: 93
+    tooltip: Show math equation editor for inserting mathematical symbols, fractions, integrals, etc.
+
+  - settingTypeId: 10
+    name: enable_numbered_headings
+    caption: Enable Numbered Headings
+    position: 94
+    tooltip: Add auto-numbered heading styles (Section 1, 1.1, 1.1.1, Chapter, etc.) to the Styles dropdown.
+
+  - settingTypeId: 10
+    name: plugin_autosave
+    caption: Enable Auto-Save
+    position: 95
+    tooltip: Automatically save drafts to prevent data loss.
+
+  - settingTypeId: 4
+    name: autosave_interval
+    caption: Auto-Save Interval (seconds)
+    position: 96
+    placeholder: "30"
+    tooltip: How often to save drafts automatically (in seconds).
+
+  - settingTypeId: 10
+    name: plugin_accordion
+    caption: Enable Accordion
+    position: 97
+    tooltip: Allow creating collapsible FAQ sections and expandable content areas.
+
+  - settingTypeId: 10
+    name: plugin_media
+    caption: Enable Media Embed
+    position: 98
+    tooltip: Allow embedding videos (YouTube, Vimeo) and audio content.
+
+  # ==========================================
+  # 7. PAGE FORMAT / WORD EXPORT (position 100-109)
+  # ==========================================
+
+  - settingTypeId: 10
+    name: page_mode_enabled
+    caption: Enable Page Mode (A4)
+    position: 100
+    tooltip: Display the editor with A4 page dimensions and visible margins for better Word export compatibility.
+
+  - settingTypeId: 1
+    name: page_format
+    caption: Page Format
+    position: 101
+    placeholder: "A4"
+    tooltip: >-
+      Page size for the editor view.
+      A4 = 210mm x 297mm (European standard).
+      Letter = 8.5in x 11in (US standard).
+      Legal = 8.5in x 14in.
+
+  - settingTypeId: 1
+    name: page_orientation
+    caption: Page Orientation
+    position: 102
+    placeholder: "portrait"
+    tooltip: >-
+      portrait = Vertical (default).
+      landscape = Horizontal.
+
+  - settingTypeId: 4
+    name: page_margin_top
+    caption: Top Margin (mm)
+    position: 103
+    placeholder: "20"
+    tooltip: Top margin in millimeters (default 20mm = 2cm).
+
+  - settingTypeId: 4
+    name: page_margin_bottom
+    caption: Bottom Margin (mm)
+    position: 104
+    placeholder: "20"
+    tooltip: Bottom margin in millimeters (default 20mm = 2cm).
+
+  - settingTypeId: 4
+    name: page_margin_left
+    caption: Left Margin (mm)
+    position: 105
+    placeholder: "10"
+    tooltip: Left margin in millimeters (default 10mm = 1cm).
+
+  - settingTypeId: 4
+    name: page_margin_right
+    caption: Right Margin (mm)
+    position: 106
+    placeholder: "10"
+    tooltip: Right margin in millimeters (default 10mm = 1cm).
+
+  - settingTypeId: 10
+    name: page_show_breaks
+    caption: Show Page Breaks
+    position: 107
+    tooltip: Display horizontal lines indicating where page breaks would occur when printed.
+
+  - settingTypeId: 4
+    name: page_zoom
+    caption: Page Zoom (%)
+    position: 108
+    placeholder: "100"
+    tooltip: >-
+      Zoom level for the page view (50-200).
+      100 = normal size. 150 = 150% larger.
+
+  - settingTypeId: 10
+    name: page_zoom_controls
+    caption: Show Zoom Controls
+    position: 109
+    tooltip: Display zoom in/out buttons in the toolbar for quick zoom adjustments.
+
+# ============================================================
+# PRODUCT SETTINGS (Specific to each product)
+# ============================================================
+# These settings can be customized per product to control
+# whether the editor is enabled and basic behavior.
+# ============================================================
+
+productSettings:
+
+  # ==========================================
+  # 1. ACTIVATION (position 1-5)
+  # ==========================================
+
+  - settingTypeId: 10
+    name: enable_tinymce
+    caption: Enable TinyMCE Editor
+    position: 1
+    tooltip: Replace RadEditor with TinyMCE on all RichText fields in this product.
+
+  - settingTypeId: 1
+    name: activation_mode
+    caption: Activation Mode
+    position: 2
+    placeholder: "auto"
+    tooltip: >-
+      auto = Replace RadEditor automatically on page load.
+      manual = Show a button to switch to TinyMCE.
+
+  - settingTypeId: 10
+    name: allow_toggle
+    caption: Allow Toggle to RadEditor
+    position: 3
+    tooltip: Show a button allowing users to switch back to RadEditor.
+
+  - settingTypeId: 10
+    name: debug_mode
+    caption: Debug Mode
+    position: 4
+    tooltip: Show detailed logs in browser console (F12).
+
+  - settingTypeId: 1
+    name: placeholder
+    caption: Placeholder Text
+    position: 5
+    placeholder: ""
+    tooltip: Text displayed when the editor is empty.
+
+  # ==========================================
+  # 2. EDITOR SIZE (position 10-19)
+  # ==========================================
+
+  - settingTypeId: 4
+    name: editor_height
+    caption: Editor Height (pixels)
+    position: 10
+    placeholder: "300"
+    tooltip: >-
+      Height of the editor in pixels. SpiraPlan default is around 300px.
+
+  - settingTypeId: 1
+    name: editor_width
+    caption: Editor Width
+    position: 11
+    placeholder: "100%"
+    tooltip: >-
+      Width of the editor. Use 100% to match SpiraPlan layout.
+
+  - settingTypeId: 4
+    name: min_height
+    caption: Minimum Height (pixels)
+    position: 12
+    placeholder: "200"
+    tooltip: Minimum height when resizing.
+
+  - settingTypeId: 4
+    name: max_height
+    caption: Maximum Height (pixels)
+    position: 13
+    placeholder: "600"
+    tooltip: Maximum height when resizing. 0 = unlimited.
+
+  - settingTypeId: 1
+    name: resize
+    caption: Allow Resize
+    position: 14
+    placeholder: "true"
+    tooltip: >-
+      true = vertical resize only.
+      false = no resize.
+      both = horizontal and vertical.
+
+# ============================================================
+# PAGE CONTENTS - Inject script on detail pages
+# ============================================================
+
+pageContents:
+  # RequirementDetails
+  - pageId: 9
+    name: nexteditor
+    code: "file://nexteditor.js"
+
+  # TestCaseDetails
+  - pageId: 10
+    name: nexteditor
+    code: "file://nexteditor.js"
+
+  # TestSetDetails
+  - pageId: 11
+    name: nexteditor
+    code: "file://nexteditor.js"
+
+  # IncidentDetails
+  - pageId: 14
+    name: nexteditor
+    code: "file://nexteditor.js"
+
+  # TaskDetails
+  - pageId: 15
+    name: nexteditor
+    code: "file://nexteditor.js"
+
+  # ReleaseDetails
+  - pageId: 16
+    name: nexteditor
+    code: "file://nexteditor.js"
+
+# Empty menus section (required to avoid SpiraPlan null reference error)
+menus: []
